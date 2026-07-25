@@ -67,7 +67,7 @@ export interface OwnershipBroadcastRecord {
 }
 
 export interface OwnershipActivationStatus {
-  schemaVersion: 1;
+  schemaVersion: 2;
   state: OwnershipActivationState;
   packageHash: string;
   sourceSha: string;
@@ -78,6 +78,15 @@ export interface OwnershipActivationStatus {
   rootSafe: string;
   timelock: string;
   rootSafeTransactionHash: string;
+  deploymentArtifactHash: string;
+  ownershipIntentArtifactHash: string;
+  governanceArtifactHash: string;
+  review: {
+    action: 'acceptOwnership';
+    targets: [string, string];
+    delaySeconds: 86400;
+    operationId: string;
+  };
   scheduledFor: number | null;
   approvals: OwnershipSafeApproval[];
   broadcastTransaction: BaseSepoliaTransaction | null;

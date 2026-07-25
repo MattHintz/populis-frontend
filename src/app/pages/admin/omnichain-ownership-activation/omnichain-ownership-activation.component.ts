@@ -119,7 +119,11 @@ import { formatError } from '../../../utils/format-error';
                   type="button"
                   class="btn btn--primary action-button"
                   (click)="sign(approval)"
-                  [disabled]="busy() || !walletHasApproval()"
+                  [disabled]="
+                    busy() ||
+                    !walletHasApproval() ||
+                    !reviewAcknowledged(operation, approval)
+                  "
                 >
                   {{ busy() ? 'Waiting for wallet…' : 'Review and sign ' + roleLabel(approval.role) }}
                 </button>
@@ -144,12 +148,53 @@ import { formatError } from '../../../utils/format-error';
             </header>
 
             <dl class="evidence">
-              <div><dt>Package</dt><dd class="mono" [title]="operation.packageHash">{{ short(operation.packageHash, 24) }}</dd></div>
-              <div><dt>Operation</dt><dd class="mono" [title]="operation.operationId">{{ short(operation.operationId, 24) }}</dd></div>
-              <div><dt>Root Safe</dt><dd class="mono" [title]="operation.rootSafe">{{ short(operation.rootSafe, 24) }}</dd></div>
-              <div><dt>Timelock</dt><dd class="mono" [title]="operation.timelock">{{ short(operation.timelock, 24) }}</dd></div>
-              <div><dt>Safe tx hash</dt><dd class="mono" [title]="operation.rootSafeTransactionHash">{{ short(operation.rootSafeTransactionHash, 24) }}</dd></div>
+              <div><dt>Action</dt><dd>Accept ownership only</dd></div>
+              <div><dt>Value</dt><dd>0 ETH</dd></div>
+              <div><dt>Package</dt><dd class="mono">{{ operation.packageHash }}</dd></div>
+              <div><dt>Operation</dt><dd class="mono">{{ operation.operationId }}</dd></div>
+              <div><dt>Root Safe</dt><dd class="mono">{{ operation.rootSafe }}</dd></div>
+              <div><dt>Timelock</dt><dd class="mono">{{ operation.timelock }}</dd></div>
+              <div><dt>Safe tx hash</dt><dd class="mono">{{ operation.rootSafeTransactionHash }}</dd></div>
             </dl>
+
+            <div class="target-list" aria-label="Ownership targets">
+              <article>
+                <span>Gateway target</span>
+                <strong class="mono">{{ operation.review.targets[0] }}</strong>
+                <small>acceptOwnership()</small>
+              </article>
+              <article>
+                <span>Escrow spoke target</span>
+                <strong class="mono">{{ operation.review.targets[1] }}</strong>
+                <small>acceptOwnership()</small>
+              </article>
+            </div>
+
+            <details class="artifact-evidence">
+              <summary>Artifact commitments</summary>
+              <dl>
+                <div><dt>Deployment</dt><dd class="mono">{{ operation.deploymentArtifactHash }}</dd></div>
+                <div><dt>Ownership intent</dt><dd class="mono">{{ operation.ownershipIntentArtifactHash }}</dd></div>
+                <div><dt>Governance</dt><dd class="mono">{{ operation.governanceArtifactHash }}</dd></div>
+              </dl>
+            </details>
+
+            @if (currentApproval(operation); as approval) {
+              @if (!approval.signed) {
+                <label class="review-confirm">
+                  <input
+                    type="checkbox"
+                    [checked]="reviewAcknowledged(operation, approval)"
+                    (change)="setReviewAcknowledged($any($event.target).checked, operation, approval)"
+                    [disabled]="busy() || !walletHasApproval()"
+                  />
+                  <span>
+                    I verified this package, Base Sepolia network, both contract
+                    targets, zero ETH value, and the 24-hour delay.
+                  </span>
+                </label>
+              }
+            }
 
             @if (operation.state === 'READY_TO_BROADCAST' && operation.broadcastTransaction) {
               <p class="action-copy">
@@ -235,7 +280,20 @@ import { formatError } from '../../../utils/format-error';
       .evidence { margin:.85rem 0; }
       .evidence div { display:grid; grid-template-columns:7.2rem minmax(0,1fr); gap:.6rem; padding:.52rem 0; border-bottom:1px solid var(--border); }
       .evidence dt { color:var(--muted); font-size:.68rem; }
-      .evidence dd { min-width:0; text-align:right; font-size:.67rem; overflow:hidden; text-overflow:ellipsis; }
+      .evidence dd { min-width:0; text-align:right; font-size:.67rem; overflow-wrap:anywhere; }
+      .target-list { display:grid; gap:.55rem; margin:.85rem 0; }
+      .target-list article { padding:.75rem; border:1px solid var(--border); background:rgba(255,255,255,.018); }
+      .target-list span,.target-list strong,.target-list small { display:block; }
+      .target-list span { color:var(--muted); font:500 .61rem var(--font-mono); text-transform:uppercase; }
+      .target-list strong { margin:.35rem 0; font-size:.69rem; overflow-wrap:anywhere; }
+      .target-list small { color:var(--accent); font-size:.65rem; }
+      .artifact-evidence { margin:.85rem 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+      .artifact-evidence summary { padding:.7rem 0; color:var(--muted); cursor:pointer; font-size:.69rem; }
+      .artifact-evidence dl { padding-bottom:.55rem; }
+      .artifact-evidence dl div { padding:.4rem 0; }
+      .artifact-evidence dd { overflow-wrap:anywhere; }
+      .review-confirm { display:grid; grid-template-columns:auto 1fr; gap:.65rem; align-items:start; margin:.85rem 0; padding:.75rem; border:1px solid rgba(124,255,178,.25); font-size:.7rem; line-height:1.45; cursor:pointer; }
+      .review-confirm input { margin-top:.12rem; accent-color:var(--accent); }
       .action-copy,.inline-note,.inline-error,.complete-note { color:var(--muted); font-size:.72rem; line-height:1.5; margin:.9rem 0; }
       .inline-error { color:#ff9f9f; }
       .complete-note { color:var(--accent); }
@@ -269,6 +327,7 @@ export class OmnichainOwnershipActivationComponent {
   readonly error = signal<string | null>(null);
   readonly actionError = signal<string | null>(null);
   readonly pendingTransactionHash = signal<string | null>(null);
+  readonly reviewAcknowledgementKey = signal<string | null>(null);
   readonly walletHasApproval = computed(() => {
     const wallet = this.wallet.address();
     const operation = this.status();
@@ -286,6 +345,7 @@ export class OmnichainOwnershipActivationComponent {
   async reload(): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
+    this.reviewAcknowledgementKey.set(null);
     try {
       this.status.set(await this.api.get());
     } catch (error) {
@@ -297,12 +357,14 @@ export class OmnichainOwnershipActivationComponent {
 
   async connectInjected(): Promise<void> {
     await this.run(async () => {
+      this.reviewAcknowledgementKey.set(null);
       await this.wallet.connectInjected();
     });
   }
 
   async connectWalletConnect(): Promise<void> {
     await this.run(async () => {
+      this.reviewAcknowledgementKey.set(null);
       await this.wallet.connectWalletConnect({
         optionalChains: 'solslot',
         resetSession: true,
@@ -313,12 +375,34 @@ export class OmnichainOwnershipActivationComponent {
   async sign(approval: OwnershipSafeApproval): Promise<void> {
     await this.run(async () => {
       this.requireAllowedWallet();
+      const operation = this.status();
+      if (!operation || !this.reviewAcknowledged(operation, approval)) {
+        throw new Error('Review and acknowledge the exact ownership operation before signing.');
+      }
       const signature = await this.wallet.signSafeMessage(
         approval.typedData,
         approval.safe,
       );
       this.status.set(await this.api.sign(signature));
+      this.reviewAcknowledgementKey.set(null);
     });
+  }
+
+  reviewAcknowledged(
+    operation: OwnershipActivationStatus,
+    approval: OwnershipSafeApproval,
+  ): boolean {
+    return this.reviewAcknowledgementKey() === this.reviewKey(operation, approval);
+  }
+
+  setReviewAcknowledged(
+    checked: boolean,
+    operation: OwnershipActivationStatus,
+    approval: OwnershipSafeApproval,
+  ): void {
+    this.reviewAcknowledgementKey.set(
+      checked ? this.reviewKey(operation, approval) : null,
+    );
   }
 
   async broadcast(operation: OwnershipActivationStatus): Promise<void> {
@@ -390,6 +474,18 @@ export class OmnichainOwnershipActivationComponent {
     if (!this.wallet.isConnected()) {
       throw new Error('Connect an EVM wallet to submit the fixed Root Safe transaction.');
     }
+  }
+
+  private reviewKey(
+    operation: OwnershipActivationStatus,
+    approval: OwnershipSafeApproval,
+  ): string {
+    return [
+      operation.packageHash.toLowerCase(),
+      approval.role,
+      (this.wallet.address() || '').toLowerCase(),
+      approval.messageHash.toLowerCase(),
+    ].join(':');
   }
 
   private async run(action: () => Promise<void>): Promise<void> {

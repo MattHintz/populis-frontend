@@ -9,7 +9,7 @@ import {
 } from './omnichain-ownership-activation.service';
 
 const status: OwnershipActivationStatus = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   state: 'AWAITING_APPROVALS',
   packageHash: `0x${'11'.repeat(32)}`,
   sourceSha: '22'.repeat(20),
@@ -20,6 +20,18 @@ const status: OwnershipActivationStatus = {
   rootSafe: '0xb7e02C216A2B3aF0cC4Ad8808fA169f2F0B19724',
   timelock: '0x5eC98d5a9C24C2a80957AB04630812C36807aad3',
   rootSafeTransactionHash: `0x${'44'.repeat(32)}`,
+  deploymentArtifactHash: `0x${'45'.repeat(32)}`,
+  ownershipIntentArtifactHash: `0x${'46'.repeat(32)}`,
+  governanceArtifactHash: `0x${'47'.repeat(32)}`,
+  review: {
+    action: 'acceptOwnership',
+    targets: [
+      '0x4A467fd9137D8aC807E3CD7E109AB4d56f9Dfa9e',
+      '0xbbEEa9bd3E8a8becdef7FC21503C295b32C62d3f',
+    ],
+    delaySeconds: 86400,
+    operationId: `0x${'33'.repeat(32)}`,
+  },
   scheduledFor: null,
   approvals: [],
   broadcastTransaction: null,
