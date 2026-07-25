@@ -138,7 +138,6 @@ jobs:
             expected_host="${{ vars.SOLSLOT_ADMIN_EXPECTED_HOSTNAME }}"
             archive="/tmp/solslot-admin-$sha.tgz"
             release_dir="$root/releases/$sha"
-            browser_dir="$release_dir/browser"
             test -n "$root"
             test -n "$public_url"
             test -n "$expected_host"
@@ -148,9 +147,9 @@ jobs:
             sudo mkdir -p "$root/releases"
             if [ ! -f "$release_dir/.release-ready" ]; then
               sudo rm -rf "$release_dir"
-              sudo mkdir -p "$browser_dir"
-              sudo tar -xzf "$archive" -C "$browser_dir"
-              python3 - "$browser_dir/release.json" "$sha" <<'PY'
+              sudo mkdir -p "$release_dir"
+              sudo tar -xzf "$archive" -C "$release_dir"
+              python3 - "$release_dir/release.json" "$sha" <<'PY'
             import json, sys
             release = json.load(open(sys.argv[1], encoding="utf-8"))
             assert release["commit"] == sys.argv[2]
