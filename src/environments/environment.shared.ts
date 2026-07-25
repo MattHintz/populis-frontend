@@ -12,7 +12,7 @@ export const environment = {
 
   faucetApi: 'http://127.0.0.1:8787',
   legacyRecallApi: 'http://127.0.0.1:5000',
-  coinsetRpc: 'https://testnet11.api.coinset.org',
+  coinsetRpc: 'http://127.0.0.1:8787/chia',
   chiaNetwork: 'testnet11' as 'testnet11' | 'mainnet',
   walletConnectProjectId: '3145bc617be2b491a8e6033b3b0fcf43',
   googleVaultEnabled: googleVaultRuntime.enabled as boolean,
