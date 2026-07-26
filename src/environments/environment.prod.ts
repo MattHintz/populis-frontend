@@ -8,7 +8,7 @@ export const environment = {
   protocolWritesEnabled: false,
   faucetApi: '/protocol-api',
   legacyRecallApi: 'https://solslot.com/telonium',
-  coinsetRpc: 'https://api.coinset.org',
+  coinsetRpc: '/protocol-api/chia',
   chiaNetwork: 'mainnet' as const,
   walletConnectProjectId: '',
   zkPassport: {

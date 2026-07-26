@@ -1,3 +1,5 @@
+import { googleVaultRuntime } from './google-vault-runtime';
+
 /** Solslot V2 development defaults. Ceremony coordinates are intentionally empty. */
 export const environment = {
   production: false,
@@ -10,9 +12,12 @@ export const environment = {
 
   faucetApi: 'http://127.0.0.1:8787',
   legacyRecallApi: 'http://127.0.0.1:5000',
-  coinsetRpc: 'https://testnet11.api.coinset.org',
+  coinsetRpc: 'http://127.0.0.1:8787/chia',
   chiaNetwork: 'testnet11' as 'testnet11' | 'mainnet',
   walletConnectProjectId: '3145bc617be2b491a8e6033b3b0fcf43',
+  googleVaultEnabled: googleVaultRuntime.enabled as boolean,
+  googleOAuthClientId: googleVaultRuntime.oauthClientId as string,
+  chiaAggSigMeAdditionalData: '37a90eb5185a9c4439a91ddc98bbadce7b4feba060d50116a067de66bf236615',
   eip712Name: 'Solslot Protocol' as const,
   eip712Version: '2' as const,
   eip712ChainId: 11155111,

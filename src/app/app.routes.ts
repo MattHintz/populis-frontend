@@ -29,6 +29,14 @@ export const routes: Routes = [
     title: 'My Vault · Solslot',
   },
   {
+    path: 'offers',
+    loadComponent: () =>
+      import('./pages/offers/offer-list.component').then(
+        (m) => m.OfferListComponent,
+      ),
+    title: 'SmartDeed Offers · Solslot',
+  },
+  {
     path: 'offers/:id',
     loadComponent: () =>
       import('./pages/offers/offer-detail.component').then(
@@ -91,13 +99,26 @@ export const routes: Routes = [
     title: 'Collection Workspace · Solslot',
   },
   {
-    path: 'admin/mint/new',
+    path: 'admin/omnichain-activation',
+    loadComponent: () =>
+      import(
+        './pages/admin/omnichain-ownership-activation/omnichain-ownership-activation.component'
+      ).then((m) => m.OmnichainOwnershipActivationComponent),
+    title: 'Base Sepolia Ownership · Solslot',
+  },
+  {
+    path: 'admin/mint',
     canActivate: [adminAuthGuard],
     loadComponent: () =>
-      import('./pages/admin/mint-new/mint-new.component').then(
-        (m) => m.MintNewComponent,
+      import('./pages/admin/mint-list/mint-list.component').then(
+        (m) => m.MintListComponent,
       ),
-    title: 'New Mint Proposal · Solslot',
+    title: 'Mint Proposals · Solslot',
+  },
+  {
+    path: 'admin/mint/new',
+    redirectTo: 'admin/collections',
+    pathMatch: 'full',
   },
   {
     path: 'admin/pool-economics-v2',
@@ -137,6 +158,24 @@ export const routes: Routes = [
         (m) => m.MintDetailComponent,
       ),
     title: 'Mint Proposal · Solslot',
+  },
+  {
+    path: 'admin/authority',
+    canActivate: [adminAuthGuard],
+    loadComponent: () =>
+      import('./pages/admin/admin-authority/admin-authority.component').then(
+        (m) => m.AdminAuthorityComponent,
+      ),
+    title: 'Current Authority · Solslot',
+  },
+  {
+    path: 'admin/approvals',
+    canActivate: [adminAuthGuard],
+    loadComponent: () =>
+      import('./pages/admin/approvals/admin-approvals.component').then(
+        (m) => m.AdminApprovalsComponent,
+      ),
+    title: 'Admin Approvals · Solslot',
   },
   {
     // Public: no guard.  Per POP-CANON-013 the committee endpoints are

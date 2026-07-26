@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { environment } from '../../environments/environment';
 import { AdminSessionService } from './admin-session.service';
+import { AdminOperationApprovalService } from './admin-operation-approval.service';
 import {
   PropertyAmendmentV1,
   PropertyDossierDraftV1,
@@ -14,11 +15,20 @@ import {
 export class CollectionApiService {
   private readonly http = inject(HttpClient);
   private readonly session = inject(AdminSessionService);
+  private readonly approvals = inject(AdminOperationApprovalService);
   private readonly base = environment.faucetApi;
 
   featureStatus(): Promise<CollectionFeatureStatus> {
     return firstValueFrom(
       this.http.get<CollectionFeatureStatus>(`${this.base}/admin/collections/feature-status`, {
+        headers: this.headers(),
+      }),
+    );
+  }
+
+  profiles(): Promise<CollectionProfiles> {
+    return firstValueFrom(
+      this.http.get<CollectionProfiles>(`${this.base}/admin/collections/profiles`, {
         headers: this.headers(),
       }),
     );
@@ -74,20 +84,44 @@ export class CollectionApiService {
   }
 
   seal(collectionId: string, revision: number): Promise<CollectionWorkspace> {
+    return this.approvals.prepareSignAndRequireSecond({
+      operation: 'collection.seal',
+      revision,
+      binding: {
+        method: 'POST',
+        path: `/admin/collections/${encodeURIComponent(collectionId)}/seal`,
+        query: [],
+        body: {},
+        ifMatch: `"${revision}"`,
+      },
+    });
+  }
+
+  addComment(
+    collectionId: string,
+    section: string,
+    body: string,
+    blocking = true,
+  ): Promise<ReviewComment> {
     return firstValueFrom(
-      this.http.post<CollectionWorkspace>(
-        `${this.base}/admin/collections/${encodeURIComponent(collectionId)}/seal`,
-        {},
-        { headers: this.headers(revision) },
+      this.http.post<ReviewComment>(
+        `${this.base}/admin/collections/${encodeURIComponent(collectionId)}/comments`,
+        { section, body, blocking },
+        { headers: this.headers() },
       ),
     );
   }
 
-  addComment(collectionId: string, section: string, body: string): Promise<ReviewComment> {
+
+  review(
+    collectionId: string,
+    decision: 'APPROVED' | 'CHANGES_REQUESTED',
+    note?: string,
+  ): Promise<CollectionWorkspace> {
     return firstValueFrom(
-      this.http.post<ReviewComment>(
-        `${this.base}/admin/collections/${encodeURIComponent(collectionId)}/comments`,
-        { section, body },
+      this.http.post<CollectionWorkspace>(
+        `${this.base}/admin/collections/${encodeURIComponent(collectionId)}/reviews`,
+        { decision, note: note?.trim() || undefined },
         { headers: this.headers() },
       ),
     );
@@ -119,13 +153,17 @@ export class CollectionApiService {
     dossier: PropertyDossierV1,
     amendment: PropertyAmendmentV1,
   ): Promise<CollectionWorkspace> {
-    return firstValueFrom(
-      this.http.post<CollectionWorkspace>(
-        `${this.base}/admin/collections/${encodeURIComponent(collectionId)}/amendments`,
-        { dossier, amendment },
-        { headers: this.headers(revision) },
-      ),
-    );
+    return this.approvals.prepareSignAndRequireSecond({
+      operation: 'collection.amend',
+      revision,
+      binding: {
+        method: 'POST',
+        path: `/admin/collections/${encodeURIComponent(collectionId)}/amendments`,
+        query: [],
+        body: { dossier, amendment },
+        ifMatch: `"${revision}"`,
+      },
+    });
   }
 
   async uploadAsset(
@@ -148,6 +186,7 @@ export class CollectionApiService {
           title: details.title,
           alt: details.alt,
           category: details.category,
+          visibility: details.visibility || 'PUBLIC',
         },
         { headers: this.headers() },
       ),
@@ -177,6 +216,80 @@ export class CollectionApiService {
     );
   }
 
+  getPresale(identifier: string): Promise<PresaleSeries> {
+    return firstValueFrom(
+      this.http.get<PresaleSeries>(
+        `${this.base}/presales/admin/${encodeURIComponent(identifier)}`,
+      ),
+    );
+  }
+
+  createPresale(
+    collection: CollectionWorkspace,
+    schedule: PresaleSchedule,
+  ): Promise<never> {
+    const body = {
+      collectionId: collection.id,
+      saleOpen: schedule.saleOpen,
+      saleClose: schedule.saleClose,
+      refundDeadline: schedule.refundDeadline,
+      launchDeadline: schedule.launchDeadline,
+    };
+    return this.approvals.prepareSignAndRequireSecond({
+      operation: 'presale.create',
+      revision: collection.revision,
+      binding: {
+        method: 'POST',
+        path: '/presales',
+        query: [],
+        body,
+      },
+    });
+  }
+
+  cancelPresale(
+    collection: CollectionWorkspace,
+    presale: PresaleSeries,
+    reason: string,
+  ): Promise<never> {
+    return this.approvals.prepareSignAndRequireSecond({
+      operation: 'presale.cancel',
+      revision: collection.revision,
+      binding: {
+        method: 'POST',
+        path: `/presales/${encodeURIComponent(presale.termsHash)}/cancel`,
+        query: [],
+        body: { reason },
+      },
+    });
+  }
+
+  launchPresale(
+    collection: CollectionWorkspace,
+    presale: PresaleSeries,
+  ): Promise<never> {
+    return this.approvals.prepareSignAndRequireSecond({
+      operation: 'presale.launch',
+      revision: collection.revision,
+      binding: {
+        method: 'POST',
+        path: `/presales/${encodeURIComponent(presale.termsHash)}/launch`,
+        query: [],
+        body: {},
+      },
+    });
+  }
+
+  privateDownload(collectionId: string, assetId: string): Promise<PrivateAssetDownload> {
+    return firstValueFrom(
+      this.http.post<PrivateAssetDownload>(
+        `${this.base}/admin/collections/${encodeURIComponent(collectionId)}/assets/${encodeURIComponent(assetId)}/private-download`,
+        {},
+        { headers: this.headers() },
+      ),
+    );
+  }
+
   private headers(revision?: number): HttpHeaders {
     let headers = new HttpHeaders({ Authorization: `Bearer ${this.session.requireJwt()}` });
     if (revision !== undefined) headers = headers.set('If-Match', `"${revision}"`);
@@ -197,6 +310,19 @@ export interface CollectionFeatureStatus {
   maxCanonicalBytes: number;
   maxAssetBytes: number;
   network: 'testnet11' | 'mainnet';
+}
+
+export interface CollectionProfiles {
+  assetClasses: Array<{ id: string; code: number; subtypes: string[] }>;
+  projectStages: string[];
+  programOverlays: string[];
+  diligence: {
+    common: string[];
+    byAssetClass: Record<string, string[]>;
+    byProjectStage: Record<string, string[]>;
+    byProgramOverlay: Record<string, string[]>;
+  };
+  legalRight: 'future-sale-or-refinance-proceeds';
 }
 
 export interface CollectionReadinessIssue {
@@ -221,6 +347,8 @@ export interface CollectionAsset {
   title?: string | null;
   alt?: string | null;
   category?: string | null;
+  visibility: 'PUBLIC' | 'PRIVATE';
+  objectKey?: string | null;
   expectedSha256: string;
   expectedMimeType: string;
   expectedByteSize: number;
@@ -257,7 +385,17 @@ export interface ReviewComment {
   actorSubject: string;
   section: string;
   body: string;
+  blocking: boolean;
   resolved: boolean;
+  createdAt: number;
+}
+
+export interface CollectionReview {
+  id: string;
+  reviewerSubject: string;
+  decision: 'APPROVED' | 'CHANGES_REQUESTED';
+  note: string | null;
+  collectionRevision: number;
   createdAt: number;
 }
 
@@ -307,6 +445,7 @@ export interface CollectionWorkspace {
   deeds: CollectionDeed[];
   assets: CollectionAsset[];
   comments: ReviewComment[];
+  reviews: CollectionReview[];
   metadataVersions: MetadataVersion[];
   anchorEvidence: AnchorEvidence[];
   auditEvents?: AuditEvent[];
@@ -341,6 +480,13 @@ export interface CollectionAssetDetails {
   title?: string;
   alt?: string;
   category?: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+}
+
+export interface PrivateAssetDownload {
+  assetId: string;
+  downloadUrl: string;
+  expiresIn: number;
 }
 
 interface PresignedAssetUpload {
@@ -350,4 +496,101 @@ interface PresignedAssetUpload {
   headers: Record<string, string>;
   expiresIn: number;
   asset: CollectionAsset;
+}
+
+export interface PresaleSchedule {
+  saleOpen: number;
+  saleClose: number;
+  refundDeadline: number;
+  launchDeadline: number;
+}
+
+export type PresaleSeriesState = 'PRESALE' | 'LIVE' | 'CANCELED';
+export type VoucherState =
+  | 'PENDING_ISSUANCE'
+  | 'ISSUANCE_SUBMITTED'
+  | 'ESCROWED'
+  | 'REFUNDING'
+  | 'REFUNDED'
+  | 'REDEEMING'
+  | 'REDEEMED';
+
+export interface PresaleVoucher {
+  serial: number;
+  deedLauncherId: string;
+  paymentRail: 'BASE_SEPOLIA_USDC' | 'CHIA_XCH';
+  paymentPrincipal: number;
+  basePriceMinor: number;
+  technologyFeeBps: number;
+  technologyFeeMinor: number;
+  grossPriceMinor: number;
+  originalPayer: string;
+  vaultLauncherId: string;
+  vaultP2PuzzleHash: string;
+  purchaseId: string;
+  globalPaymentId: string;
+  commitmentHash: string;
+  state: VoucherState;
+  deliveryDeadline: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PresaleSeries {
+  schema: 'solslot.refundable-voucher-series.v2';
+  termsHash: string;
+  seriesSingletonId: string;
+  collectionId: string;
+  state: PresaleSeriesState;
+  terms: {
+    collectionWorkspaceId: string;
+    collectionId: string;
+    metadataRoot: string;
+    metadataAnchorId: string;
+    allocationRoot: string;
+    trustedProtocolTreasury: string;
+    inventoryCap: number;
+    saleOpen: number;
+    saleClose: number;
+    refundDeadline: number;
+    launchDeadline: number;
+    deliveryWindowSeconds: number;
+    technologyFeeBps: number;
+    deeds: Array<{
+      deedId: string;
+      deedLauncherId: string;
+      ordinal: number;
+      sharePpm: number;
+      parValueMojos: number;
+      basePriceMinor: number;
+      technologyFeeMinor: number;
+      grossPriceMinor: number;
+    }>;
+  };
+  singletonLaunch: {
+    parentCoinId: string | null;
+    fullPuzzleHash: string | null;
+    spendBundleId: string | null;
+    status: 'MEMPOOL_ACCEPTED' | 'LEGACY_TEST_FIXTURE';
+  };
+  vouchers: PresaleVoucher[];
+  launchedAt: number | null;
+  deliveryDeadline: number | null;
+  launchEvidenceId: string | null;
+  governanceExecutionId: string | null;
+  cancelReason: string | null;
+  phaseTransition: {
+    targetState: PresaleSeriesState | null;
+    spendBundleId: string | null;
+    inputCoinId: string | null;
+    outputCoinId: string | null;
+    outputInnerPuzzleHash: string | null;
+    launchAnchor: number | null;
+    governanceExecutionIds: string[];
+    submittedAt: number | null;
+    confirmedHeight: number | null;
+    status: 'NOT_SUBMITTED' | 'MEMPOOL_ACCEPTED' | 'CONFIRMED';
+  };
+  createdAt: number;
+  updatedAt: number;
 }

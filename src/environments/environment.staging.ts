@@ -8,5 +8,6 @@ export const environment = {
   strictProtocolCoordinatePins: true,
   faucetApi: '/protocol-api',
   legacyRecallApi: '/telonium',
+  coinsetRpc: '/protocol-api/chia',
   walletConnectProjectId: devEnvironment.walletConnectProjectId,
 };

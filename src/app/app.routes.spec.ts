@@ -5,6 +5,12 @@ describe('admin portal route boundary', () => {
     expect(routes.some((route) => route.path === 'admin/genesis')).toBeTrue();
   });
 
+  it('exposes the pre-ceremony Safe ownership handoff without a chain-admin guard', () => {
+    const route = routes.find((candidate) => candidate.path === 'admin/omnichain-activation');
+    expect(route).toBeDefined();
+    expect(route?.canActivate).toBeUndefined();
+  });
+
   it('does not expose retired one-off bootstrap or authority launch screens', () => {
     const active = new Set(routes.map((route) => route.path));
     for (const path of [

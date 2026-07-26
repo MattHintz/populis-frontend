@@ -5,23 +5,13 @@ import { environment } from '../../environments/environment';
 import { mojoAmountToSafeNumber } from '../utils/mojo-amount';
 
 /**
- * Direct read/write client for coinset.org's Chia full-node RPC.
+ * Read/write client for the Solslot API's allowlisted Chia RPC boundary.
  *
  * Reads (lineage walks, coin lookups) are the daily-driver use case.
  *
- * Writes (``push_tx``) were originally routed through the Solslot API,
- * but that creates a censorship vector for trust-minimised flows like
- * the v2 admin-authority lifecycle (Phase 9-Hermes-D).  Solslot's
- * frontend (research/solslot-frontend/slui/src/app/services/chia-aggregator.service.ts)
- * proves direct browser → coinset push works in production; we adopt
- * the same pattern for v2 launches + rotations so admins can submit
- * spend bundles even when Solslot is offline or compromised.
- *
- * For non-trust-critical writes (vault registration, mint proposals)
- * the API path is still preferred for rate-limit + audit-log
- * convenience.
- *
- * API docs: https://docs.coinset.org
+ * The API uses the authenticated local full node first and a circuit-broken
+ * Coinset fallback. Keeping one boundary gives admin and customer flows the
+ * same network view and submission rules.
  */
 @Injectable({ providedIn: 'root' })
 export class CoinsetService {
@@ -54,12 +44,12 @@ export class CoinsetService {
     includeSpent = false
   ): Promise<CoinRecord[]> {
     const body = {
-      puzzle_hash: normalizeHex(puzzleHash),
+      puzzle_hashes: [normalizeHex(puzzleHash)],
       include_spent_coins: includeSpent,
     };
     const res = await firstValueFrom(
       this.http.post<{ coin_records: CoinRecord[]; success: boolean }>(
-        `${this.base}/get_coin_records_by_puzzle_hash`,
+        `${this.base}/get_coin_records_by_puzzle_hashes`,
         body
       )
     );
@@ -163,12 +153,7 @@ export class CoinsetService {
   }
 
   /**
-   * Broadcast a signed spend bundle directly to coinset.org.
-   *
-   * This is the trust-minimised submission path for the v2 admin-authority
-   * lifecycle: launches + rotations don't depend on the Solslot API
-   * being reachable.  Mirrors solslot's
-   * ``ChiaAggregatorService.pushTransaction`` pattern.
+   * Broadcast a signed spend bundle through the allowlisted Chia boundary.
    *
    * **Wire format.** coinset.org's ``/push_tx`` accepts:
    * ```json
@@ -219,7 +204,7 @@ export class CoinsetService {
         this.http.post<PushTxResponseRaw>(`${this.base}/push_tx`, body),
       );
     } catch (err) {
-      // coinset.org returns its rejection reasons in the HTTP body
+      // The provider returns node rejection reasons in the HTTP body
       // even on 4xx responses — Angular's HttpClient buries those
       // in ``HttpErrorResponse.error``.  Surface the body verbatim
       // (incl. the bundle we sent) so operators can diagnose without
@@ -233,7 +218,7 @@ export class CoinsetService {
         // debugging.  Don't include this in the thrown message —
         // bundles are huge — but a single console.error is harmless.
         console.error('[CoinsetService] push_tx rejected with status', err.status, {
-          coinsetError: detail,
+          providerError: detail,
           bundle: wireBundle,
         });
         throw new Error(

@@ -150,6 +150,7 @@ function artifact(): SolslotPublicArtifact {
   };
   return {
     schemaVersion: 2,
+    sourceManifestVersion: 3,
     protocolVersion: 'solslot-v2',
     network: 'testnet11',
     evmChainId: 11155111,
@@ -161,9 +162,13 @@ function artifact(): SolslotPublicArtifact {
     sourceShas: {
       protocol: '1'.repeat(40),
       evm: '2'.repeat(40),
-      api: '3'.repeat(40),
-      customerWeb: '4'.repeat(40),
-      adminPortal: '5'.repeat(40),
+      omnichain: '3'.repeat(40),
+      api: '4'.repeat(40),
+      legacyBackend: '5'.repeat(40),
+      keyOfSolomon: '6'.repeat(40),
+      samuel: '7'.repeat(40),
+      customerWeb: '8'.repeat(40),
+      adminPortal: '9'.repeat(40),
     },
     ceremony: {
       ceremonyId: 'ceremony-1',
@@ -177,6 +182,7 @@ function artifact(): SolslotPublicArtifact {
       poolInnerPuzzleHash: hex(11),
       didInnerPuzzleHash: hex(21),
       didFullPuzzleHash: hex(22),
+      protocolTreasuryPuzzleHash: hex(26),
       propertyRegistryFullPuzzleHash: hex(23),
       p2PoolModHash: hex(24),
       p2VaultModHash: hex(25),
@@ -187,6 +193,7 @@ function artifact(): SolslotPublicArtifact {
       treeHash: hex(14),
       launcherId: launchers.governance,
       serialized: '0xff80',
+      mintExecuteCosignerPubkey: `0x${'2b'.repeat(48)}`,
     },
     protocolDid: {
       launcherId: launchers.did,
@@ -216,6 +223,10 @@ function artifact(): SolslotPublicArtifact {
     },
     adminAuthority: {
       threshold: 2,
+      policy: 'owner-plus-one',
+      ownerIndex: 0,
+      coadminIndices: [1, 2],
+      coadminThreshold: 1,
       rosterHash: hex(15),
       mipsRootHash: hex(16),
       compressedPubkeys: [compressed(1), compressed(2), compressed(3)],
@@ -238,7 +249,10 @@ function artifact(): SolslotPublicArtifact {
       verifierAdapter: address(2),
       attestationEmitter: address(3),
     },
-    signaturePolicy: { type: 'eip712', threshold: 2, rosterHash: hex(15) },
+    signaturePolicy: {
+      type: 'eip712', threshold: 2, policy: 'owner-plus-one', ownerIndex: 0,
+      coadminIndices: [1, 2], coadminThreshold: 1, rosterHash: hex(15),
+    },
     retiredCoordinates: [hex(19)],
     signatures: [],
   };

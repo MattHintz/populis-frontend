@@ -240,13 +240,16 @@ export interface ChallengeResponse {
    * signTypedData_v4.  Only used for `auth_type === 'evm'`.
    */
   typed_data?: Eip712TypedData;
+  /** 32-byte registration payload a Chia wallet signs using CHIP-0002. */
+  message_hex?: string;
 }
 
 export interface Eip712TypedData {
   domain: {
-    name: string;
-    version: string;
-    chainId: number;
+    name?: string;
+    version?: string;
+    chainId: number | string;
+    verifyingContract?: string;
   };
   types: Record<string, Array<{ name: string; type: string }>>;
   primaryType: string;
@@ -352,6 +355,7 @@ export interface ZkPassportEnrollmentRecord {
 
 export interface SolslotPublicArtifact {
   schemaVersion: 2;
+  sourceManifestVersion: 3;
   protocolVersion: 'solslot-v2';
   network: 'testnet11';
   evmChainId: 11155111;
@@ -363,7 +367,11 @@ export interface SolslotPublicArtifact {
   sourceShas: {
     protocol: string;
     evm: string;
+    omnichain: string;
     api: string;
+    legacyBackend: string;
+    keyOfSolomon: string;
+    samuel: string;
     customerWeb: string;
     adminPortal: string;
   };
@@ -391,6 +399,7 @@ export interface SolslotPublicArtifact {
     sgtTailHash?: string;
     didInnerPuzzleHash?: string;
     didFullPuzzleHash?: string;
+    protocolTreasuryPuzzleHash: string;
     propertyRegistryInnerModHash?: string;
     propertyRegistryFullPuzzleHash?: string;
     [key: string]: string | undefined;
@@ -401,6 +410,7 @@ export interface SolslotPublicArtifact {
     treeHash: string;
     launcherId: string;
     serialized: string;
+    mintExecuteCosignerPubkey: string;
   };
   protocolDid: {
     launcherId: string;
@@ -431,6 +441,10 @@ export interface SolslotPublicArtifact {
   };
   adminAuthority: {
     threshold: number;
+    policy: 'owner-plus-one';
+    ownerIndex: 0;
+    coadminIndices: [1, 2];
+    coadminThreshold: 1;
     rosterHash: string;
     mipsRootHash: string;
     compressedPubkeys: string[];
@@ -451,7 +465,15 @@ export interface SolslotPublicArtifact {
     attestationEmitter: string;
     [key: string]: string;
   };
-  signaturePolicy: { type: string; threshold: number; rosterHash: string };
+  signaturePolicy: {
+    type: string;
+    threshold: number;
+    policy: 'owner-plus-one';
+    ownerIndex: 0;
+    coadminIndices: [1, 2];
+    coadminThreshold: 1;
+    rosterHash: string;
+  };
   retiredCoordinates: string[];
   signatures: Array<{
     adminIndex: number;
