@@ -14,6 +14,10 @@ on:
         description: "Exact 40-character admin-portal commit SHA."
         required: true
         type: string
+      release_tag:
+        description: "Annotated coordinated release tag resolving to release_sha."
+        required: true
+        type: string
       rollback_release:
         description: "Previously verified 40-character release SHA to reactivate."
         required: false
@@ -35,12 +39,20 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
 
       - name: Verify exact source
         run: |
           set -euo pipefail
           [[ "${{ inputs.release_sha }}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${{ inputs.release_tag }}" =~ ^solslot-v2-alpha-rc[0-9]+(\.[0-9]+)?-[0-9]{8}$ ]]
           test "$(git rev-parse HEAD)" = "${{ inputs.release_sha }}"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "${{ inputs.release_sha }}" origin/main
+          git fetch --force origin \
+            "refs/tags/${{ inputs.release_tag }}:refs/tags/${{ inputs.release_tag }}"
+          test "$(git rev-list -n 1 "${{ inputs.release_tag }}")" \
+            = "${{ inputs.release_sha }}"
 
       - uses: actions/setup-node@v4
         with:
@@ -78,7 +90,7 @@ jobs:
           const output = process.argv[2];
           fs.writeFileSync(output, JSON.stringify({
             schemaVersion: 1,
-            release: "solslot-v2-alpha-rc20-20260722",
+            release: "${{ inputs.release_tag }}",
             repository: process.env.GITHUB_REPOSITORY,
             commit: "${{ inputs.release_sha }}",
             environment: "${{ inputs.target }}",
