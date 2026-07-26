@@ -78,7 +78,7 @@ type StateFilter = 'ALL' | CollectionState;
       } @else {
         <div class="collection-table" role="table" aria-label="Property collections">
           <div class="table-head" role="row">
-            <span>Collection</span><span>Readiness</span><span>Allocation</span><span>Updated</span>
+              <span>Collection</span><span>Readiness</span><span>Ownership plan</span><span>Updated</span>
           </div>
           @for (collection of filtered(); track collection.id) {
             <a
@@ -91,15 +91,15 @@ type StateFilter = 'ALL' | CollectionState;
                   {{ collection.state }}
                 </span>
                 <strong>{{ collection.dossier.title }}</strong>
-                <small class="mono">{{ collection.id }}</small>
+                <small>{{ propertyTypeLabel(collection) }}</small>
               </span>
               <span class="readiness">
                 <strong>{{ readinessLabel(collection) }}</strong>
                 <small>{{ collection.readiness.issues.length || 0 }} open checks</small>
               </span>
               <span>
-                <strong>{{ allocation(collection) | number }} ppm</strong>
-                <small>{{ collection.deeds.length || collection.dossier.deedAllocation.length }} deeds</small>
+                <strong>{{ allocationPercent(collection) | number: '1.0-3' }}% planned</strong>
+                <small>{{ deedCount(collection) }} SmartDeeds</small>
               </span>
               <span>
                 <strong>{{ collection.updatedAt * 1000 | date: 'MMM d, y' }}</strong>
@@ -125,25 +125,18 @@ type StateFilter = 'ALL' | CollectionState;
             <h2>Create property collection</h2>
           </header>
           <label>
-            Collection ID
-            <input
-              name="collectionId"
-              [(ngModel)]="newCollectionId"
-              required
-              maxlength="120"
-              placeholder="HARBOR-17"
-            />
-          </label>
-          <label>
             Property title
             <input
               name="title"
               [(ngModel)]="newTitle"
               required
               maxlength="180"
-              placeholder="17 Harbor Street"
+              placeholder="127 Eastmoreland Street"
             />
           </label>
+          <p class="identifier-note">
+            Solslot creates the permanent collection identifier automatically.
+          </p>
           @if (createError()) {
             <div class="form-error">{{ createError() }}</div>
           }
@@ -196,6 +189,7 @@ type StateFilter = 'ALL' | CollectionState;
       label { display:grid; gap:.35rem; color:var(--muted); font-size:.72rem; }
       .dialog-actions { display:flex; justify-content:flex-end; gap:.6rem; margin-top:.5rem; }
       .form-error { color:#ff9c9c; font-size:.72rem; }
+      .identifier-note { margin:0; color:var(--muted); font-size:.7rem; }
       @media (max-width:760px) { .desk-header { align-items:flex-start; flex-direction:column; } .table-head { display:none; } .collection-row { grid-template-columns:1fr 1fr; } .collection-name { grid-column:1/-1; } .notice { grid-template-columns:1fr; } }
     `,
   ],
@@ -222,7 +216,6 @@ export class CollectionsComponent {
       : this.collections().filter((collection) => collection.state === state);
   });
 
-  newCollectionId = '';
   newTitle = '';
 
   constructor() {
@@ -252,7 +245,11 @@ export class CollectionsComponent {
     this.creating.set(true);
     this.createError.set(null);
     try {
-      const created = await this.api.create(this.newCollectionId.trim(), this.newTitle.trim());
+      const title = this.newTitle.trim();
+      if (!title) {
+        throw new Error('Enter the property title.');
+      }
+      const created = await this.api.create(title);
       this.createOpen.set(false);
       await this.router.navigate(['/admin/collections', created.id]);
     } catch (error) {
@@ -268,11 +265,38 @@ export class CollectionsComponent {
     return 'Needs attention';
   }
 
-  allocation(collection: CollectionWorkspace): number {
-    return collection.dossier.deedAllocation.reduce(
+  allocationPercent(collection: CollectionWorkspace): number {
+    return (
+      collection.dossier.deedAllocation.reduce(
       (total, deed) => total + (deed.sharePpm || 0),
       0,
+      ) / 10_000
     );
+  }
+
+  deedCount(collection: CollectionWorkspace): number {
+    return collection.deeds.length || collection.dossier.deedAllocation.length;
+  }
+
+  propertyTypeLabel(collection: CollectionWorkspace): string {
+    const classification = collection.dossier.classification;
+    if (!classification?.assetClass || !classification.projectStage) {
+      return 'Classification not complete';
+    }
+    const classLabels: Record<NonNullable<typeof classification.assetClass>, string> = {
+      'RWA-RE-RES': 'Residential',
+      'RWA-RE-MFR': 'Multifamily',
+      'RWA-RE-COM': 'Commercial',
+      'RWA-RE-IND': 'Industrial',
+      'RWA-RE-HOS': 'Hospitality',
+      'RWA-RE-LAND': 'Land',
+      'RWA-RE-MIX': 'Mixed-use',
+    };
+    const stage = classification.projectStage
+      .toLowerCase()
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (value: string) => value.toUpperCase());
+    return `${classLabels[classification.assetClass]} · ${stage}`;
   }
 
   stateLabel(state: CollectionState): string {
@@ -286,4 +310,5 @@ export class CollectionsComponent {
   logout(): void {
     this.session.logoutAndRedirect();
   }
+
 }

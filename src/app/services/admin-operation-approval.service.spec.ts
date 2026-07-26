@@ -39,6 +39,8 @@ function approval(status: 'pending' | 'approved' | 'consumed'): AdminOperationAp
     authorityLauncherId: `0x${'11'.repeat(32)}`,
     network: 'testnet11',
     nonce: `0x${'55'.repeat(32)}`,
+    createdBy: `0x${'66'.repeat(20)}`,
+    createdAt: 1_799_999_900,
     requestBinding: {
       method: 'POST',
       path: '/admin/collections/alpha/seal',

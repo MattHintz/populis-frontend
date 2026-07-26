@@ -10,6 +10,7 @@ import {
   CollectionApiService,
   CollectionAsset,
   CollectionDeed,
+  CollectionDisplayUnitConversion,
   CollectionFeatureStatus,
   CollectionProfiles,
   CollectionWorkspace,
@@ -230,25 +231,25 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
                   <fieldset [disabled]="!canEdit()">
                     <h3>Valuation</h3>
                     <label>As-of date<input type="date" [(ngModel)]="draft.valuation!.asOfDate" (ngModelChange)="changed()" /></label>
-                    <label>Market value, minor units<input type="text" inputmode="numeric" [(ngModel)]="draft.valuation!.marketValueMinor" (ngModelChange)="changed()" /></label>
-                    <label>Currency<input type="text" [(ngModel)]="draft.valuation!.currency" (ngModelChange)="changed()" maxlength="3" /></label>
+                    <label>Market value ($)<input type="text" inputmode="decimal" [(ngModel)]="displayUnits.marketValueUsd" (ngModelChange)="changed()" placeholder="825000.00" /></label>
+                    <label>Currency<input type="text" value="USD" readonly /></label>
                     <label>Method<input type="text" [(ngModel)]="draft.valuation!.method" (ngModelChange)="changed()" /></label>
                     <label class="span-2">Source<input type="text" [(ngModel)]="draft.valuation!.source" (ngModelChange)="changed()" /></label>
                     <h3>Offering terms</h3>
-                    <label>Target raise, minor units<input type="text" inputmode="numeric" [(ngModel)]="draft.offering!.targetRaiseMinor" (ngModelChange)="changed()" /></label>
-                    <label>Currency<input type="text" [(ngModel)]="draft.offering!.currency" (ngModelChange)="changed()" maxlength="3" /></label>
-                    <label>Collection par, mojos<input type="text" inputmode="numeric" [(ngModel)]="draft.offering!.parValueMojos" (ngModelChange)="changed()" /></label>
-                    <label>Minimum investment, minor units<input type="text" inputmode="numeric" [(ngModel)]="draft.offering!.minimumInvestmentMinor" (ngModelChange)="changed()" /></label>
-                    <label>Projected return, bps<input type="text" inputmode="numeric" [(ngModel)]="draft.offering!.projectedReturnBps" (ngModelChange)="changed()" /></label>
+                    <label>Target raise ($)<input type="text" inputmode="decimal" [(ngModel)]="displayUnits.targetRaiseUsd" (ngModelChange)="changed()" placeholder="500000.00" /></label>
+                    <label>Currency<input type="text" value="USD" readonly /></label>
+                    <label>Minimum investment ($)<input type="text" inputmode="decimal" [(ngModel)]="displayUnits.minimumInvestmentUsd" (ngModelChange)="changed()" placeholder="500.00" /></label>
+                    <label>Projected return (%)<input type="text" inputmode="decimal" [(ngModel)]="displayUnits.projectedReturnPercent" (ngModelChange)="changed()" placeholder="6.00" /></label>
                     <label>Term, months<input type="text" inputmode="numeric" [(ngModel)]="draft.offering!.termMonths" (ngModelChange)="changed()" /></label>
                     <label>Asset class<input type="text" [value]="draft.offering!.assetClass || 'Choose in Classification'" readonly /></label>
                     <label>Jurisdiction<input type="text" [(ngModel)]="draft.offering!.jurisdiction" (ngModelChange)="changed()" placeholder="US-TX" /></label>
                     <label class="span-2">Protocol treasury<input class="mono" type="text" [value]="draft.offering!.royaltyPuzhash || 'Signed ceremony treasury unavailable'" readonly /></label>
-                    <label>Technology fee, bps<input type="number" min="0" max="1000" [(ngModel)]="draft.offering!.royaltyBps" (ngModelChange)="changed()" /></label>
-                    <label>Governance quorum, SGT mojos<input type="text" inputmode="numeric" [(ngModel)]="draft.offering!.governanceQuorum" (ngModelChange)="changed()" /></label>
+                    <label>Technology fee (%)<input type="text" inputmode="decimal" [(ngModel)]="displayUnits.technologyFeePercent" (ngModelChange)="changed()" placeholder="2.50" /></label>
+                    <label>Governance approval<input type="text" value="Required under the signed protocol rules" readonly /></label>
+                    <p class="span-2 field-help">The server derives Chia par values from the current signed XCH oracle quote. Administrators cannot override them.</p>
                     <h3>Capital</h3>
-                    <label>Debt balance, minor units<input type="text" inputmode="numeric" [(ngModel)]="draft.capital!.debtBalanceMinor" (ngModelChange)="changed()" /></label>
-                    <label>Debt rate, bps<input type="text" inputmode="numeric" [(ngModel)]="draft.capital!.debtRateBps" (ngModelChange)="changed()" /></label>
+                    <label>Debt balance ($)<input type="text" inputmode="decimal" [(ngModel)]="displayUnits.debtBalanceUsd" (ngModelChange)="changed()" /></label>
+                    <label>Debt rate (%)<input type="text" inputmode="decimal" [(ngModel)]="displayUnits.debtRatePercent" (ngModelChange)="changed()" /></label>
                     <label>Debt maturity<input type="date" [(ngModel)]="draft.capital!.debtMaturityDate" (ngModelChange)="changed()" /></label>
                     <label>Debt currency<input type="text" [(ngModel)]="draft.capital!.currency" (ngModelChange)="changed()" maxlength="3" /></label>
                   </fieldset>
@@ -259,14 +260,14 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
                   <fieldset [disabled]="!canEdit()">
                     <label>Occupancy status<input type="text" [(ngModel)]="draft.operations!.occupancyStatus" (ngModelChange)="changed()" /></label>
                     <label>Manager<input type="text" [(ngModel)]="draft.operations!.manager" (ngModelChange)="changed()" /></label>
-                    <label>Monthly gross rent, minor units<input type="text" inputmode="numeric" [(ngModel)]="draft.operations!.monthlyGrossRentMinor" (ngModelChange)="changed()" /></label>
-                    <label>Annual operating expense, minor units<input type="text" inputmode="numeric" [(ngModel)]="draft.operations!.annualOperatingExpenseMinor" (ngModelChange)="changed()" /></label>
-                    <label>Currency<input type="text" [(ngModel)]="draft.operations!.currency" (ngModelChange)="changed()" maxlength="3" /></label>
+                    <label>Monthly gross rent ($)<input type="text" inputmode="decimal" [(ngModel)]="displayUnits.monthlyGrossRentUsd" (ngModelChange)="changed()" /></label>
+                    <label>Annual operating expense ($)<input type="text" inputmode="decimal" [(ngModel)]="displayUnits.annualOperatingExpenseUsd" (ngModelChange)="changed()" /></label>
+                    <label>Currency<input type="text" value="USD" readonly /></label>
                     <label class="span-2">Lease summary<textarea rows="7" [(ngModel)]="draft.operations!.leaseSummary" (ngModelChange)="changed()"></textarea></label>
                     <h3>Planned uses</h3>
                     @for (use of draft.capital!.plannedUses; track $index) {
                       <label>Use<input type="text" [(ngModel)]="use.label" (ngModelChange)="changed()" /></label>
-                      <label>Amount, minor units<input type="text" inputmode="numeric" [(ngModel)]="use.amountMinor" (ngModelChange)="changed()" /></label>
+                      <label>Amount ($)<input type="text" inputmode="decimal" [(ngModel)]="displayUnits.plannedUseUsd[$index]" (ngModelChange)="changed()" /></label>
                       <button class="row-remove" type="button" (click)="removePlannedUse($index)">Remove use</button>
                     }
                     <button class="row-add" type="button" (click)="addPlannedUse()">Add planned use</button>
@@ -341,11 +342,11 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
 
                 @case ('allocation') {
                   <div class="section-head"><span>Immutable after first proposal</span><h2>Deed allocation</h2></div>
-                  <div class="allocation-total" [class.is-complete]="allocationTotal() === 1000000"><strong>{{ allocationTotal() | number }} ppm</strong><span>{{ allocationTotal() === 1000000 ? 'Complete' : 'Must equal 1,000,000 ppm' }}</span></div>
+                  <div class="allocation-total" [class.is-complete]="allocationTotalPercent() === 100"><strong>{{ allocationTotalPercent() | number:'1.0-4' }}%</strong><span>{{ allocationTotalPercent() === 100 ? 'Complete' : 'Ownership must total 100%' }}</span></div>
                   <fieldset class="stacked" [disabled]="!canEdit() || collection.allocationLocked">
                     @for (deed of draft.deedAllocation; track $index) {
                       <article class="repeat-row allocation-row">
-                        <div class="field-grid"><label>Deed ID<input class="mono" type="text" [(ngModel)]="deed.deedId" (ngModelChange)="changed()" /></label><label>Share, ppm<input type="number" min="1" max="1000000" [(ngModel)]="deed.sharePpm" (ngModelChange)="changed()" /></label><label class="span-2">Par value, mojos<input type="text" inputmode="numeric" [(ngModel)]="deed.parValueMojos" (ngModelChange)="changed()" /></label></div>
+                        <div class="field-grid"><label>Deed ID<input class="mono" type="text" [(ngModel)]="deed.deedId" (ngModelChange)="changed()" /></label><label>Ownership share (%)<input type="text" inputmode="decimal" [(ngModel)]="displayUnits.deedSharesPercent[$index]" (ngModelChange)="changed()" placeholder="4.00" /></label><label class="span-2">System-derived price<input type="text" [value]="draftDeedPrice($index)" readonly /></label></div>
                         <button type="button" (click)="removeDeed($index)">Remove deed</button>
                       </article>
                     } @empty { <p class="empty-row">No SmartDeeds planned.</p> }
@@ -417,8 +418,8 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
                     <div class="proposal-list">
                       @for (deed of campaign.terms.deeds; track deed.deedId) {
                         <article>
-                          <div><strong class="mono">{{ deed.deedId }}</strong><span>{{ deed.basePriceMinor }} base + {{ deed.technologyFeeMinor }} fee</span></div>
-                          <span>{{ deed.grossPriceMinor }} USD minor</span>
+                          <div><strong class="mono">{{ deed.deedId }}</strong><span>{{ formatMoney(deed.basePriceMinor) }} base + {{ formatMoney(deed.technologyFeeMinor) }} fee</span></div>
+                          <span>{{ formatMoney(deed.grossPriceMinor) }}</span>
                         </article>
                       }
                     </div>
@@ -459,7 +460,7 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
                   <div class="section-head"><span>System-derived primary terms</span><h2>Sales</h2></div>
                   <div class="proposal-list">
                     @for (deed of collection.deeds; track deed.deedId) {
-                      <article><div><strong class="mono">{{ deed.deedId }}</strong><span>{{ deed.sharePpm | number }} ppm</span></div><span>{{ purchasePrice(deed) }}</span></article>
+                      <article><div><strong class="mono">{{ deed.deedId }}</strong><span>{{ sharePercent(deed.sharePpm) }}</span></div><span>{{ purchasePrice(deed) }}</span></article>
                     }
                   </div>
                 }
@@ -484,7 +485,7 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
                     <div class="proposal-list">
                       @for (deed of collection.deeds; track deed.deedId) {
                         <article>
-                          <div><strong class="mono">{{ deed.deedId }}</strong><span>{{ deed.sharePpm | number }} ppm · {{ deed.proposalState }}</span></div>
+                          <div><strong class="mono">{{ deed.deedId }}</strong><span>{{ sharePercent(deed.sharePpm) }} ownership · {{ deed.proposalState }}</span></div>
                           @if (deed.proposalId) { <a [routerLink]="['/admin/mint', deed.proposalId]">Open proposal</a> } @else { <button type="button" (click)="prepareProposal(deed)" [disabled]="!ownerMemberHash() || proposalBusy()">Review proposal</button> }
                         </article>
                       }
@@ -492,7 +493,8 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
                     @if (mintPreview(); as preview) {
                       <section class="sign-review">
                         <div class="section-head section-head--small"><span>Wallet signing review</span><h2>{{ preview.deedId }}</h2></div>
-                        <dl class="commitment-grid"><div><dt>Proposal ID</dt><dd class="mono">{{ preview.proposalId }}</dd></div><div><dt>Metadata root</dt><dd class="mono">{{ preview.metadataRoot }}</dd></div><div><dt>Anchor</dt><dd class="mono">{{ preview.metadataAnchorId || 'This deed launcher' }}</dd></div><div><dt>Payload</dt><dd>{{ preview.canonicalByteSize | number }} bytes</dd></div><div><dt>Estimated consensus cost</dt><dd>{{ preview.estimatedConsensusCost | number }} cost units</dd></div><div><dt>Governance threshold</dt><dd>{{ preview.governanceThreshold | number }} SGT mojos</dd></div><div><dt>Network</dt><dd>{{ preview.network }}</dd></div><div><dt>Wallet</dt><dd class="mono">{{ preview.walletSubject }}</dd></div></dl>
+                        <dl class="commitment-grid"><div><dt>Purpose</dt><dd>Publish this SmartDeed for protocol voting</dd></div><div><dt>Financial effect</dt><dd>No customer funds move in this step</dd></div><div><dt>Approval</dt><dd>Protocol governance vote required</dd></div><div><dt>Network</dt><dd>{{ preview.network }}</dd></div></dl>
+                        <details class="technical-evidence"><summary>Technical evidence</summary><dl class="commitment-grid"><div><dt>Proposal ID</dt><dd class="mono">{{ preview.proposalId }}</dd></div><div><dt>Metadata root</dt><dd class="mono">{{ preview.metadataRoot }}</dd></div><div><dt>Anchor</dt><dd class="mono">{{ preview.metadataAnchorId || 'This deed launcher' }}</dd></div><div><dt>Payload</dt><dd>{{ preview.canonicalByteSize | number }} bytes</dd></div><div><dt>Estimated consensus cost</dt><dd>{{ preview.estimatedConsensusCost | number }} cost units</dd></div><div><dt>Governance threshold</dt><dd>{{ preview.governanceThreshold | number }} SGT mojos</dd></div><div><dt>Wallet</dt><dd class="mono">{{ preview.walletSubject }}</dd></div></dl></details>
                         <button class="btn btn--primary" type="button" (click)="publishProposal()" [disabled]="proposalBusy()">{{ proposalBusy() ? 'Waiting for wallet…' : 'Sign and publish proposal' }}</button>
                       </section>
                     }
@@ -507,13 +509,13 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
                           <div class="field-grid">
                             <label class="span-2">Investor summary<textarea rows="4" [(ngModel)]="amendmentForm.summary"></textarea></label>
                             <label>Valuation as-of date<input type="date" [(ngModel)]="amendmentForm.valuationAsOfDate" /></label>
-                            <label>Market value, minor units<input type="text" inputmode="numeric" [(ngModel)]="amendmentForm.marketValueMinor" /></label>
+                            <label>Market value ($)<input type="text" inputmode="decimal" [(ngModel)]="amendmentForm.marketValueUsd" /></label>
                             <label>Valuation method<input type="text" [(ngModel)]="amendmentForm.valuationMethod" /></label>
                             <label>Valuation source<input type="text" [(ngModel)]="amendmentForm.valuationSource" /></label>
                             <label>Occupancy status<input type="text" [(ngModel)]="amendmentForm.occupancyStatus" /></label>
                             <label>Manager<input type="text" [(ngModel)]="amendmentForm.manager" /></label>
-                            <label>Monthly gross rent, minor units<input type="text" inputmode="numeric" [(ngModel)]="amendmentForm.monthlyGrossRentMinor" /></label>
-                            <label>Annual operating expense, minor units<input type="text" inputmode="numeric" [(ngModel)]="amendmentForm.annualOperatingExpenseMinor" /></label>
+                            <label>Monthly gross rent ($)<input type="text" inputmode="decimal" [(ngModel)]="amendmentForm.monthlyGrossRentUsd" /></label>
+                            <label>Annual operating expense ($)<input type="text" inputmode="decimal" [(ngModel)]="amendmentForm.annualOperatingExpenseUsd" /></label>
                             <label class="span-2">Lease summary<textarea rows="4" [(ngModel)]="amendmentForm.leaseSummary"></textarea></label>
                             <label>Effective date<input type="date" [(ngModel)]="amendmentForm.effectiveDate" /></label>
                             <label class="span-2">Reason<textarea rows="3" [(ngModel)]="amendmentForm.reason"></textarea></label>
@@ -530,7 +532,7 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
 
             <aside class="review-rail">
               <div><span class="rail-label">Readiness</span><strong>{{ collection.readiness.ready ? 'Ready' : collection.readiness.issues.length + ' checks' }}</strong></div>
-              <div><span class="rail-label">Allocation</span><strong>{{ allocationTotal() | number }} ppm</strong></div>
+              <div><span class="rail-label">Allocation</span><strong>{{ allocationTotalPercent() | number:'1.0-4' }}%</strong></div>
               <div><span class="rail-label">Assets</span><strong>{{ pinnedAssetCount() }} / {{ collection.assets.length }} verified</strong></div>
               <div><span class="rail-label">Open comments</span><strong>{{ openCommentCount() }}</strong></div>
               <button type="button" (click)="activeSection.set('review')">Open review</button>
@@ -565,6 +567,10 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
       fieldset,.field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; margin:0; padding:0; border:0; }
       fieldset h3 { grid-column:1/-1; margin:1rem 0 0; font:600 .82rem var(--font-sans); letter-spacing:0; }
       fieldset.stacked { grid-template-columns:1fr; }
+      .field-help { margin:0; color:var(--muted); font-size:.7rem; line-height:1.6; }
+      .technical-evidence { margin-top:1rem; border:1px solid var(--border); padding:.75rem; }
+      .technical-evidence summary { cursor:pointer; color:var(--muted); font:.65rem var(--font-mono); }
+      .technical-evidence .commitment-grid { margin-top:.75rem; }
       label { display:grid; align-content:start; gap:.35rem; color:var(--muted); font-size:.66rem; }
       input,textarea,select { min-width:0; border-radius:5px; font-size:.76rem; }
       input[type='number'],input[type='date'],input[type='url'] { width:100%; border:1px solid rgba(246,241,232,.18); border-radius:5px; background:rgba(0,0,0,.22); color:var(--text); padding:.78rem .85rem; }
@@ -673,6 +679,7 @@ export class CollectionEditorComponent implements OnDestroy {
   readonly presaleError = signal<string | null>(null);
 
   draftModel: PropertyDossierDraftV1 | null = null;
+  displayUnits: CollectionDisplayUnits = emptyCollectionDisplayUnits();
   mediaRole: 'hero' | 'gallery' | 'site' | 'rendering' | 'plan' | 'floorplan' | 'other' = 'hero';
   mediaAlt = '';
   documentTitle = '';
@@ -1037,19 +1044,38 @@ export class CollectionEditorComponent implements OnDestroy {
   removePrivateDocument(index: number): void { this.draftModel?.privateDocuments.splice(index, 1); this.changed(); }
   addRisk(): void { this.draftModel?.risks.push({ severity: 'medium' }); this.changed(); }
   removeRisk(index: number): void { this.draftModel?.risks.splice(index, 1); this.changed(); }
-  addPlannedUse(): void { this.draftModel?.capital?.plannedUses.push({}); this.changed(); }
-  removePlannedUse(index: number): void { this.draftModel?.capital?.plannedUses.splice(index, 1); this.changed(); }
+  addPlannedUse(): void {
+    this.draftModel?.capital?.plannedUses.push({});
+    this.displayUnits.plannedUseUsd.push('');
+    this.changed();
+  }
+  removePlannedUse(index: number): void {
+    this.draftModel?.capital?.plannedUses.splice(index, 1);
+    this.displayUnits.plannedUseUsd.splice(index, 1);
+    this.changed();
+  }
   addDisclosure(): void { this.draftModel?.disclosures.push(''); this.changed(); }
   removeDisclosure(index: number): void { this.draftModel?.disclosures.splice(index, 1); this.changed(); }
   addSource(): void { this.draftModel?.dataSources.push({}); this.changed(); }
   removeSource(index: number): void { this.draftModel?.dataSources.splice(index, 1); this.changed(); }
   addHistory(): void { this.draftModel?.history.push({}); this.changed(); }
   removeHistory(index: number): void { this.draftModel?.history.splice(index, 1); this.changed(); }
-  addDeed(): void { this.draftModel?.deedAllocation.push({}); this.changed(); }
-  removeDeed(index: number): void { this.draftModel?.deedAllocation.splice(index, 1); this.changed(); }
+  addDeed(): void {
+    this.draftModel?.deedAllocation.push({});
+    this.displayUnits.deedSharesPercent.push('');
+    this.changed();
+  }
+  removeDeed(index: number): void {
+    this.draftModel?.deedAllocation.splice(index, 1);
+    this.displayUnits.deedSharesPercent.splice(index, 1);
+    this.changed();
+  }
 
-  allocationTotal(): number {
-    return this.draftModel?.deedAllocation.reduce((total, deed) => total + (deed.sharePpm || 0), 0) || 0;
+  allocationTotalPercent(): number {
+    return this.displayUnits.deedSharesPercent.reduce((total, value) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? total + parsed : total;
+    }, 0);
   }
 
   assetStatus(assetId: string): CollectionAsset | null {
@@ -1113,7 +1139,27 @@ export class CollectionEditorComponent implements OnDestroy {
     if (numerator % 1_000_000n) return 'Allocation does not resolve to minor units';
     const base = numerator / 1_000_000n;
     const feeMinor = (base * BigInt(fee) + 9_999n) / 10_000n;
-    return `${base.toString()} base + ${feeMinor.toString()} fee = ${(base + feeMinor).toString()} USD minor units`;
+    return `${formatUsdMinor(base)} base + ${formatUsdMinor(feeMinor)} fee = ${formatUsdMinor(base + feeMinor)}`;
+  }
+
+  draftDeedPrice(index: number): string {
+    const target = Number(this.displayUnits.targetRaiseUsd);
+    const share = Number(this.displayUnits.deedSharesPercent[index]);
+    const feePercent = Number(this.displayUnits.technologyFeePercent);
+    if (![target, share, feePercent].every(Number.isFinite) || target <= 0 || share <= 0 || feePercent < 0) {
+      return 'Complete target raise, ownership, and fee';
+    }
+    const base = target * share / 100;
+    const fee = Math.ceil(base * feePercent) / 100;
+    return `${formatUsd(base)} base + ${formatUsd(fee)} fee = ${formatUsd(base + fee)}`;
+  }
+
+  formatMoney(value: number | string): string {
+    return formatUsdMinor(BigInt(value));
+  }
+
+  sharePercent(value: number): string {
+    return `${trimDecimal(value / 10_000, 4)}%`;
   }
 
   async createPresale(): Promise<void> {
@@ -1282,12 +1328,12 @@ export class CollectionEditorComponent implements OnDestroy {
     this.amendmentForm = {
       summary: dossier.summary,
       valuationAsOfDate: dossier.valuation.asOfDate,
-      marketValueMinor: dossier.valuation.marketValueMinor,
+      marketValueUsd: minorToDisplayDollars(dossier.valuation.marketValueMinor),
       valuationMethod: dossier.valuation.method,
       valuationSource: dossier.valuation.source,
       occupancyStatus: dossier.operations.occupancyStatus,
-      monthlyGrossRentMinor: dossier.operations.monthlyGrossRentMinor,
-      annualOperatingExpenseMinor: dossier.operations.annualOperatingExpenseMinor,
+      monthlyGrossRentUsd: minorToDisplayDollars(dossier.operations.monthlyGrossRentMinor),
+      annualOperatingExpenseUsd: minorToDisplayDollars(dossier.operations.annualOperatingExpenseMinor),
       manager: dossier.operations.manager || '',
       leaseSummary: dossier.operations.leaseSummary || '',
       effectiveDate: new Date().toISOString().slice(0, 10),
@@ -1305,14 +1351,24 @@ export class CollectionEditorComponent implements OnDestroy {
     try {
       const dossier = structuredClone(collection.dossier) as PropertyDossierV1;
       const changedFields: string[] = [];
+      const conversion = await this.api.convertDisplayUnits({
+        money: compactDisplayValues({
+          amendmentMarketValue: this.amendmentForm.marketValueUsd,
+          amendmentMonthlyRent: this.amendmentForm.monthlyGrossRentUsd,
+          amendmentAnnualExpense: this.amendmentForm.annualOperatingExpenseUsd,
+        }),
+        percentages: {},
+        ownershipShares: {},
+        deriveXchPar: false,
+      });
       assignChanged(dossier, 'summary', this.amendmentForm.summary, '/summary', changedFields);
       assignChanged(dossier.valuation, 'asOfDate', this.amendmentForm.valuationAsOfDate, '/valuation/asOfDate', changedFields);
-      assignChanged(dossier.valuation, 'marketValueMinor', this.amendmentForm.marketValueMinor, '/valuation/marketValueMinor', changedFields);
+      assignChanged(dossier.valuation, 'marketValueMinor', conversion.moneyMinor['amendmentMarketValue'], '/valuation/marketValueMinor', changedFields);
       assignChanged(dossier.valuation, 'method', this.amendmentForm.valuationMethod, '/valuation/method', changedFields);
       assignChanged(dossier.valuation, 'source', this.amendmentForm.valuationSource, '/valuation/source', changedFields);
       assignChanged(dossier.operations, 'occupancyStatus', this.amendmentForm.occupancyStatus, '/operations/occupancyStatus', changedFields);
-      assignChanged(dossier.operations, 'monthlyGrossRentMinor', this.amendmentForm.monthlyGrossRentMinor, '/operations/monthlyGrossRentMinor', changedFields);
-      assignChanged(dossier.operations, 'annualOperatingExpenseMinor', this.amendmentForm.annualOperatingExpenseMinor, '/operations/annualOperatingExpenseMinor', changedFields);
+      assignChanged(dossier.operations, 'monthlyGrossRentMinor', conversion.moneyMinor['amendmentMonthlyRent'], '/operations/monthlyGrossRentMinor', changedFields);
+      assignChanged(dossier.operations, 'annualOperatingExpenseMinor', conversion.moneyMinor['amendmentAnnualExpense'], '/operations/annualOperatingExpenseMinor', changedFields);
       assignChanged(dossier.operations, 'manager', this.amendmentForm.manager || undefined, '/operations/manager', changedFields);
       assignChanged(dossier.operations, 'leaseSummary', this.amendmentForm.leaseSummary || undefined, '/operations/leaseSummary', changedFields);
       const signed = await this.amendments.sign(
@@ -1371,6 +1427,10 @@ export class CollectionEditorComponent implements OnDestroy {
     this.saveError.set(null);
     try {
       const payload = cleanDraft(this.draftModel, collection.revision);
+      const conversion = await this.api.convertDisplayUnits(
+        displayUnitRequest(this.displayUnits),
+      );
+      applyDisplayUnitConversion(payload, conversion);
       const saved = await this.api.update(collection.id, payload, collection.revision, submitForReview);
       if (generation === this.editGeneration) {
         this.applyWorkspace(saved);
@@ -1399,6 +1459,7 @@ export class CollectionEditorComponent implements OnDestroy {
   private applyWorkspace(collection: CollectionWorkspace): void {
     this.workspace.set(collection);
     this.draftModel = normalizeDraft(collection.dossier);
+    this.displayUnits = displayUnitsFromDraft(this.draftModel);
     this.syncTrustedTreasury();
     this.conflictServer.set(null);
     this.saveQueued = false;
@@ -1437,7 +1498,112 @@ function normalizeDraft(value: PropertyDossierDraftV1): PropertyDossierDraftV1 {
   draft.capital ||= { plannedUses: [] };
   draft.capital.plannedUses ||= [];
   draft.legal ||= {};
+  draft.valuation.currency ||= 'USD';
+  draft.offering.currency ||= 'USD';
+  draft.operations.currency ||= 'USD';
+  draft.capital.currency ||= 'USD';
   return draft;
+}
+
+interface CollectionDisplayUnits {
+  marketValueUsd: string;
+  targetRaiseUsd: string;
+  minimumInvestmentUsd: string;
+  projectedReturnPercent: string;
+  technologyFeePercent: string;
+  debtBalanceUsd: string;
+  debtRatePercent: string;
+  monthlyGrossRentUsd: string;
+  annualOperatingExpenseUsd: string;
+  plannedUseUsd: string[];
+  deedSharesPercent: string[];
+}
+
+function emptyCollectionDisplayUnits(): CollectionDisplayUnits {
+  return {
+    marketValueUsd: '',
+    targetRaiseUsd: '',
+    minimumInvestmentUsd: '',
+    projectedReturnPercent: '',
+    technologyFeePercent: '',
+    debtBalanceUsd: '',
+    debtRatePercent: '',
+    monthlyGrossRentUsd: '',
+    annualOperatingExpenseUsd: '',
+    plannedUseUsd: [],
+    deedSharesPercent: [],
+  };
+}
+
+function displayUnitsFromDraft(draft: PropertyDossierDraftV1): CollectionDisplayUnits {
+  return {
+    marketValueUsd: minorToDisplayDollars(draft.valuation?.marketValueMinor),
+    targetRaiseUsd: minorToDisplayDollars(draft.offering?.targetRaiseMinor),
+    minimumInvestmentUsd: minorToDisplayDollars(draft.offering?.minimumInvestmentMinor),
+    projectedReturnPercent: scaledIntegerToDisplay(draft.offering?.projectedReturnBps, 2),
+    technologyFeePercent: scaledIntegerToDisplay(draft.offering?.royaltyBps, 2),
+    debtBalanceUsd: minorToDisplayDollars(draft.capital?.debtBalanceMinor),
+    debtRatePercent: scaledIntegerToDisplay(draft.capital?.debtRateBps, 2),
+    monthlyGrossRentUsd: minorToDisplayDollars(draft.operations?.monthlyGrossRentMinor),
+    annualOperatingExpenseUsd: minorToDisplayDollars(draft.operations?.annualOperatingExpenseMinor),
+    plannedUseUsd: (draft.capital?.plannedUses || []).map((item) => minorToDisplayDollars(item.amountMinor)),
+    deedSharesPercent: draft.deedAllocation.map((deed) => scaledIntegerToDisplay(deed.sharePpm, 4)),
+  };
+}
+
+function displayUnitRequest(display: CollectionDisplayUnits) {
+  return {
+    money: compactDisplayValues({
+      marketValue: display.marketValueUsd,
+      targetRaise: display.targetRaiseUsd,
+      minimumInvestment: display.minimumInvestmentUsd,
+      debtBalance: display.debtBalanceUsd,
+      monthlyGrossRent: display.monthlyGrossRentUsd,
+      annualOperatingExpense: display.annualOperatingExpenseUsd,
+      ...Object.fromEntries(display.plannedUseUsd.map((value, index) => [`plannedUse.${index}`, value])),
+    }),
+    percentages: compactDisplayValues({
+      projectedReturn: display.projectedReturnPercent,
+      technologyFee: display.technologyFeePercent,
+      debtRate: display.debtRatePercent,
+    }),
+    ownershipShares: compactDisplayValues(
+      Object.fromEntries(display.deedSharesPercent.map((value, index) => [`deed.${index}`, value])),
+    ),
+    deriveXchPar: Boolean(display.targetRaiseUsd.trim()),
+  };
+}
+
+function applyDisplayUnitConversion(
+  draft: PropertyDossierDraftV1,
+  conversion: CollectionDisplayUnitConversion,
+): void {
+  draft.valuation ||= {};
+  draft.offering ||= {};
+  draft.operations ||= {};
+  draft.capital ||= { plannedUses: [] };
+  draft.valuation.currency = 'USD';
+  draft.offering.currency = 'USD';
+  draft.operations.currency = 'USD';
+  draft.capital.currency = 'USD';
+  draft.valuation.marketValueMinor = conversion.moneyMinor['marketValue'];
+  draft.offering.targetRaiseMinor = conversion.moneyMinor['targetRaise'];
+  draft.offering.minimumInvestmentMinor = conversion.moneyMinor['minimumInvestment'];
+  draft.offering.projectedReturnBps = conversion.percentageBps['projectedReturn'];
+  draft.offering.royaltyBps = conversion.percentageBps['technologyFee'];
+  draft.offering.governanceQuorum = conversion.governanceQuorum;
+  draft.capital.debtBalanceMinor = conversion.moneyMinor['debtBalance'];
+  draft.capital.debtRateBps = conversion.percentageBps['debtRate'];
+  draft.operations.monthlyGrossRentMinor = conversion.moneyMinor['monthlyGrossRent'];
+  draft.operations.annualOperatingExpenseMinor = conversion.moneyMinor['annualOperatingExpense'];
+  draft.capital.plannedUses.forEach((item, index) => {
+    item.amountMinor = conversion.moneyMinor[`plannedUse.${index}`];
+  });
+  draft.deedAllocation.forEach((deed, index) => {
+    deed.sharePpm = conversion.ownershipPpm[`deed.${index}`];
+    deed.parValueMojos = conversion.xchParMojos?.deeds[`deed.${index}`];
+  });
+  draft.offering.parValueMojos = conversion.xchParMojos?.collection;
 }
 
 function cleanDraft(value: PropertyDossierDraftV1, revision: number): PropertyDossierDraftV1 {
@@ -1504,12 +1670,12 @@ function sectionForPath(path: string): EditorSection {
 interface OperationalUpdateForm {
   summary: string;
   valuationAsOfDate: string;
-  marketValueMinor: string;
+  marketValueUsd: string;
   valuationMethod: string;
   valuationSource: string;
   occupancyStatus: string;
-  monthlyGrossRentMinor: string;
-  annualOperatingExpenseMinor: string;
+  monthlyGrossRentUsd: string;
+  annualOperatingExpenseUsd: string;
   manager: string;
   leaseSummary: string;
   effectiveDate: string;
@@ -1518,10 +1684,55 @@ interface OperationalUpdateForm {
 
 function emptyOperationalUpdate(): OperationalUpdateForm {
   return {
-    summary: '', valuationAsOfDate: '', marketValueMinor: '', valuationMethod: '',
-    valuationSource: '', occupancyStatus: '', monthlyGrossRentMinor: '',
-    annualOperatingExpenseMinor: '', manager: '', leaseSummary: '', effectiveDate: '', reason: '',
+    summary: '', valuationAsOfDate: '', marketValueUsd: '', valuationMethod: '',
+    valuationSource: '', occupancyStatus: '', monthlyGrossRentUsd: '',
+    annualOperatingExpenseUsd: '', manager: '', leaseSummary: '', effectiveDate: '', reason: '',
   };
+}
+
+function compactDisplayValues(values: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(values)
+      .map(([key, value]) => [key, value.trim()])
+      .filter(([, value]) => Boolean(value)),
+  );
+}
+
+function minorToDisplayDollars(value: string | number | undefined): string {
+  return scaledIntegerToDisplay(value, 2);
+}
+
+function scaledIntegerToDisplay(
+  value: string | number | undefined,
+  decimalPlaces: number,
+): string {
+  if (value === undefined || value === null || value === '') return '';
+  const text = String(value);
+  if (!/^\d+$/.test(text)) return '';
+  const padded = text.padStart(decimalPlaces + 1, '0');
+  const whole = padded.slice(0, -decimalPlaces);
+  const fraction = padded.slice(-decimalPlaces).replace(/0+$/, '');
+  return fraction ? `${whole}.${fraction}` : whole;
+}
+
+function formatUsdMinor(value: bigint): string {
+  return formatUsd(Number(value) / 100);
+}
+
+function formatUsd(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function trimDecimal(value: number, maximumFractionDigits: number): string {
+  return new Intl.NumberFormat('en-US', {
+    useGrouping: false,
+    maximumFractionDigits,
+  }).format(value);
 }
 
 interface PresaleScheduleForm {

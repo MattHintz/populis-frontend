@@ -1,0 +1,768 @@
+<main class="launch-shell">
+  @if (error()) {
+    <div class="launch-alert launch-alert--error" role="alert">
+      <strong>Action needs attention</strong>
+      <span>{{ error() }}</span>
+    </div>
+  }
+  @if (message()) {
+    <div class="launch-alert" role="status">
+      <strong>Saved</strong>
+      <span>{{ message() }}</span>
+    </div>
+  }
+
+  @if (!workspace()) {
+    <section class="access-panel" aria-labelledby="launch-title">
+      <div class="access-panel__brand">Solslot</div>
+      <div class="access-panel__copy">
+        <span class="eyebrow">Testnet11 administrator access</span>
+        <h1 id="launch-title">Alpha Protocol Launch</h1>
+
+        @if (publicStatus() && !publicStatus()?.enabled) {
+          <p>The guided launch desk is not open on this server. No ceremony action is available.</p>
+        } @else if (secureLinkMode() === 'owner') {
+          <p>
+            This private link starts a new launch and assigns your connected wallet as the owner in
+            Administrator 1.
+          </p>
+          <div class="profile-fields">
+            <label>
+              <span>Owner name</span>
+              <input [(ngModel)]="ownerName" autocomplete="name" />
+            </label>
+            <label>
+              <span>Email for task reminders</span>
+              <input [(ngModel)]="ownerEmail" type="email" autocomplete="email" />
+            </label>
+          </div>
+          <div class="wallet-actions">
+            <button
+              type="button"
+              class="btn btn--primary"
+              [disabled]="!!pending()"
+              (click)="claimOwner('injected')"
+            >
+              Continue with browser wallet
+            </button>
+            <button
+              type="button"
+              class="btn btn--ghost"
+              [disabled]="!!pending()"
+              (click)="claimOwner('walletconnect')"
+            >
+              Continue with mobile or hardware wallet
+            </button>
+          </div>
+        } @else if (secureLinkMode() === 'invite') {
+          <p>
+            You were invited as a Solslot coadministrator. Connect the wallet you will use for this
+            launch.
+          </p>
+          <div class="wallet-actions">
+            <button
+              type="button"
+              class="btn btn--primary"
+              [disabled]="!!pending()"
+              (click)="acceptInvite('injected')"
+            >
+              Enroll browser wallet
+            </button>
+            <button
+              type="button"
+              class="btn btn--ghost"
+              [disabled]="!!pending()"
+              (click)="acceptInvite('walletconnect')"
+            >
+              Enroll mobile or hardware wallet
+            </button>
+          </div>
+        } @else {
+          <p>
+            Connect an enrolled administrator wallet. The desk finds your launch and role
+            automatically.
+          </p>
+          <div class="wallet-actions">
+            <button
+              type="button"
+              class="btn btn--primary"
+              [disabled]="!!pending()"
+              (click)="signIn('injected')"
+            >
+              Sign in with browser wallet
+            </button>
+            <button
+              type="button"
+              class="btn btn--ghost"
+              [disabled]="!!pending()"
+              (click)="signIn('walletconnect')"
+            >
+              Sign in with mobile or hardware wallet
+            </button>
+          </div>
+        }
+      </div>
+      <footer>
+        Wallet signatures approve only the exact action shown. No wallet seed phrase or private key
+        is sent to Solslot.
+      </footer>
+    </section>
+  } @else {
+    <header class="launch-header">
+      <div>
+        <span class="eyebrow">Solslot Testnet Alpha</span>
+        <h1>Alpha Protocol Launch</h1>
+        <p>
+          Signed in as {{ displayRole(workspace()!.session.role) }}, Administrator
+          {{ workspace()!.session.slot }}
+        </p>
+      </div>
+      <div class="launch-header__actions">
+        <span class="wallet-label">{{ connectedWalletLabel() }}</span>
+        <button type="button" class="btn btn--ghost" (click)="logout()">Sign out</button>
+      </div>
+    </header>
+
+    <div class="launch-layout">
+      <nav class="stage-nav" aria-label="Alpha launch progress">
+        <ol>
+          @for (stage of stages; track stage.label; let index = $index) {
+            <li
+              [class.is-current]="index === currentStageIndex()"
+              [class.is-complete]="index < currentStageIndex()"
+            >
+              <span class="stage-number">{{ index + 1 }}</span>
+              <div>
+                <strong>{{ stage.label }}</strong>
+                <small>{{ stage.description }}</small>
+              </div>
+            </li>
+          }
+        </ol>
+      </nav>
+
+      <div class="launch-main">
+        <section class="next-action" aria-labelledby="next-task-title">
+          <div>
+            <span class="eyebrow">Your next task</span>
+            <h2 id="next-task-title">{{ workspace()!.nextTask.title }}</h2>
+            <p>{{ workspace()!.nextTask.body }}</p>
+            <span class="assignment">
+              Assigned to {{ displayRole(workspace()!.nextTask.assignedRole) }}
+            </span>
+          </div>
+          <button
+            type="button"
+            class="btn btn--primary"
+            [disabled]="!!pending()"
+            (click)="runPrimaryAction()"
+          >
+            {{ pending() ? 'Working...' : primaryActionLabel() }}
+          </button>
+        </section>
+
+        <section class="workspace-section" aria-labelledby="readiness-title">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Continuous checks</span>
+              <h2 id="readiness-title">Launch readiness</h2>
+            </div>
+            <button
+              type="button"
+              class="icon-button"
+              title="Refresh readiness"
+              (click)="runPrimaryAction()"
+            >
+              <span aria-hidden="true">&#8635;</span>
+              <span class="sr-only">Refresh readiness</span>
+            </button>
+          </div>
+          <div class="readiness-list">
+            @for (item of workspace()!.readiness; track item.id) {
+              <article class="readiness-row">
+                <span [class]="statusClass(item.status)">{{ item.status }}</span>
+                <div>
+                  <strong>{{ item.title }}</strong>
+                  <p>{{ item.impact }}</p>
+                  <small>Assigned to {{ displayRole(item.assignedRole) }}</small>
+                  @if (item.evidence) {
+                    <details>
+                      <summary>Technical evidence</summary>
+                      <pre>{{ item.evidence | json }}</pre>
+                    </details>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+
+        <section
+          id="administrator-team"
+          class="workspace-section"
+          aria-labelledby="administrators-title"
+        >
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Owner plus one authority</span>
+              <h2 id="administrators-title">Administrator team</h2>
+            </div>
+            <strong>{{ enrolledCount() }} of 3 enrolled</strong>
+          </div>
+          <div class="administrator-list">
+            @for (admin of workspace()!.launch.administrators; track admin.slot) {
+              <article class="administrator-row">
+                <span class="admin-slot">{{ admin.slot }}</span>
+                <div>
+                  <strong>
+                    {{ admin.profile?.displayName || 'Administrator ' + admin.slot }}
+                  </strong>
+                  <p>{{ admin.role }}</p>
+                  @if (admin.wallet) {
+                    <small class="mono">{{ admin.wallet }}</small>
+                  }
+                </div>
+                <span
+                  [class]="admin.enrolled ? 'status status--healthy' : 'status status--waiting'"
+                >
+                  {{ admin.enrolled ? 'Enrolled' : 'Waiting' }}
+                </span>
+              </article>
+            }
+          </div>
+
+          @if (ownerSession() && enrolledCount() < 3) {
+            <div class="invite-grid">
+              <form (ngSubmit)="issueInvitation(2)">
+                <h3>Admin 2</h3>
+                <label>
+                  <span>Name</span>
+                  <input [(ngModel)]="admin2Name" name="admin2Name" autocomplete="off" />
+                </label>
+                <label>
+                  <span>Email for reminders</span>
+                  <input
+                    [(ngModel)]="admin2Email"
+                    name="admin2Email"
+                    type="email"
+                    autocomplete="off"
+                  />
+                </label>
+                <button type="submit" class="btn btn--ghost" [disabled]="!!pending()">
+                  {{ invitationLinks()[2] ? 'Reissue private link' : 'Create private link' }}
+                </button>
+                @if (invitationLinks()[2]) {
+                  <button type="button" class="text-button" (click)="copyInvitation(2)">
+                    Copy Admin 2 link
+                  </button>
+                }
+              </form>
+              <form (ngSubmit)="issueInvitation(3)">
+                <h3>Admin 3</h3>
+                <label>
+                  <span>Name</span>
+                  <input [(ngModel)]="admin3Name" name="admin3Name" autocomplete="off" />
+                </label>
+                <label>
+                  <span>Email for reminders</span>
+                  <input
+                    [(ngModel)]="admin3Email"
+                    name="admin3Email"
+                    type="email"
+                    autocomplete="off"
+                  />
+                </label>
+                <button type="submit" class="btn btn--ghost" [disabled]="!!pending()">
+                  {{ invitationLinks()[3] ? 'Reissue private link' : 'Create private link' }}
+                </button>
+                @if (invitationLinks()[3]) {
+                  <button type="button" class="text-button" (click)="copyInvitation(3)">
+                    Copy Admin 3 link
+                  </button>
+                }
+              </form>
+            </div>
+          }
+        </section>
+
+        <section id="rail-ownership" class="workspace-section">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Payment rail</span>
+              <h2>Base Sepolia ownership</h2>
+            </div>
+            <span
+              [class]="
+                railOwnership()?.status?.state === 'DONE'
+                  ? 'status status--healthy'
+                  : 'status status--waiting'
+              "
+            >
+              {{ railStateLabel() }}
+            </span>
+          </div>
+          <p>{{ finding('railOwnership')?.impact }}</p>
+          <div class="operation-callout">
+            <strong>
+              {{
+                railOwnership()?.status?.phase === 'execute'
+                  ? 'Final acceptance'
+                  : 'Schedule ownership'
+              }}
+            </strong>
+            <span>
+              Scheduling and execution use fresh owner-plus-one approvals. Contract addresses and
+              calldata stay in technical evidence.
+            </span>
+          </div>
+          @if (railOwnership(); as rail) {
+            <dl class="plain-summary plain-summary--three">
+              <div>
+                <dt>Step</dt>
+                <dd>{{ rail.status.phase === 'schedule' ? 'Schedule' : 'Execute' }}</dd>
+              </div>
+              <div>
+                <dt>Approvals</dt>
+                <dd>{{ railSignedCount() }} of 2</dd>
+              </div>
+              <div>
+                <dt>Safety delay</dt>
+                <dd>
+                  {{
+                    rail.status.scheduledFor
+                      ? formatTime(rail.status.scheduledFor)
+                      : 'Begins after scheduling'
+                  }}
+                </dd>
+              </div>
+            </dl>
+          }
+          <div class="inline-actions">
+            <button
+              type="button"
+              class="btn btn--ghost"
+              [disabled]="!!pending() || railOwnership()?.status?.state === 'DONE'"
+              (click)="advanceRailOwnership()"
+            >
+              {{
+                currentRailApproval() && !currentRailApproval()?.signed
+                  ? 'Review and approve'
+                  : railOwnership()?.status?.broadcastTransaction
+                    ? 'Review and submit'
+                    : 'Refresh rail status'
+              }}
+            </button>
+          </div>
+        </section>
+
+        <section id="settlement-rehearsal" class="workspace-section">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Delivery proof</span>
+              <h2>Settlement rehearsal</h2>
+            </div>
+            <span
+              [class]="
+                settlementRehearsal()?.status?.state === 'SUCCEEDED'
+                  ? 'status status--healthy'
+                  : settlementRehearsal()?.status?.state === 'FAILED'
+                    ? 'status status--blocked'
+                    : 'status status--waiting'
+              "
+            >
+              {{
+                settlementRehearsal()?.status?.state === 'SUCCEEDED'
+                  ? 'Passed'
+                  : settlementRehearsal()?.status?.state === 'FAILED'
+                    ? 'Needs attention'
+                    : 'Waiting'
+              }}
+            </span>
+          </div>
+          <p>{{ finding('settlement')?.impact }}</p>
+          <div class="operation-callout">
+            <strong>
+              {{
+                settlementRehearsal()?.status?.step ||
+                  'Ready for a technical coadministrator'
+              }}
+            </strong>
+            <span>
+              {{
+                settlementRehearsal()?.status?.message ||
+                  'The test must prove payment, validator quorum, SmartDeed delivery, and an exact refund.'
+              }}
+            </span>
+          </div>
+          <dl class="plain-summary plain-summary--three">
+            <div>
+              <dt>Payment</dt>
+              <dd>Base Sepolia faucet USDC</dd>
+            </div>
+            <div>
+              <dt>Approval</dt>
+              <dd>zkPassport-approved test vault</dd>
+            </div>
+            <div>
+              <dt>Required result</dt>
+              <dd>Delivery and exact refund</dd>
+            </div>
+          </dl>
+          <div class="inline-actions">
+            <button
+              type="button"
+              class="btn btn--ghost"
+              [disabled]="
+                !!pending() ||
+                !coadminSession() ||
+                settlementRehearsal()?.status?.state === 'SUCCEEDED'
+              "
+              (click)="advanceSettlementRehearsal()"
+            >
+              {{
+                settlementRehearsal()?.status?.walletTransaction
+                  ? 'Review test purchase'
+                  : settlementRehearsal()?.status?.state === 'FAILED'
+                    ? 'Retry fixed rehearsal'
+                    : settlementRehearsal()?.status?.state === 'NOT_STARTED'
+                      ? 'Start fixed rehearsal'
+                      : 'Refresh rehearsal'
+              }}
+            </button>
+            @if (!coadminSession()) {
+              <small>Assigned to either enrolled coadministrator.</small>
+            }
+          </div>
+          @if (settlementRehearsal()?.status?.evidenceDigest) {
+            <details>
+              <summary>Verified rehearsal evidence</summary>
+              <p class="mono">{{ settlementRehearsal()?.status?.evidenceDigest }}</p>
+            </details>
+          }
+        </section>
+
+        <section class="workspace-section" aria-labelledby="funding-title">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Fixed Testnet11 transaction</span>
+              <h2 id="funding-title">Ceremony funding</h2>
+            </div>
+            <span [class]="statusClass(finding('funding')?.status || 'Waiting')">
+              {{ finding('funding')?.status || 'Waiting' }}
+            </span>
+          </div>
+          <p>
+            Solslot creates nine predetermined ceremony inputs from the configured faucet. Amounts,
+            destinations, and the zero fee cannot be edited.
+          </p>
+          @if (fundingReceipt(); as receipt) {
+            <dl class="plain-summary">
+              <div>
+                <dt>Total test funds</dt>
+                <dd>1,000,558 mojos</dd>
+              </div>
+              <div>
+                <dt>Network fee</dt>
+                <dd>0</dd>
+              </div>
+              <div>
+                <dt>Approval</dt>
+                <dd>{{ approval('funding')?.slots?.length || 0 }} of 2 required</dd>
+              </div>
+              <div>
+                <dt>Transaction</dt>
+                <dd>{{ receipt.state }}</dd>
+              </div>
+            </dl>
+            <details>
+              <summary>View the nine fixed output amounts</summary>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Purpose</th>
+                    <th>Test mojos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (output of receipt.plan.outputs; track output.name) {
+                    <tr>
+                      <td>{{ output.name }}</td>
+                      <td>{{ output.amount }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </details>
+            <div class="inline-actions">
+              @if (!hasCurrentApproval('funding')) {
+                <button type="button" class="btn btn--ghost" (click)="reviewFundingApproval()">
+                  Review and approve
+                </button>
+              }
+              @if (
+                approval('funding')?.approved && ownerSession() && receipt.state === 'prepared'
+              ) {
+                <button type="button" class="btn btn--primary" (click)="executeFunding()">
+                  Create fixed funding
+                </button>
+              }
+              @if (receipt.state === 'broadcast' || receipt.state === 'ambiguous') {
+                <button type="button" class="btn btn--ghost" (click)="confirmFunding()">
+                  Check confirmation
+                </button>
+              }
+            </div>
+          } @else {
+            <button type="button" class="btn btn--ghost" (click)="prepareFunding()">
+              Check faucet and prepare funding
+            </button>
+          }
+        </section>
+
+        @if (workspace()!.launch.state === 'plan_approved') {
+          <section class="workspace-section" aria-labelledby="window-title">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">Bounded chain access</span>
+                <h2 id="window-title">Final launch window</h2>
+              </div>
+              <span
+                [class]="
+                  gateOpen('ceremonyBroadcast')
+                    ? 'status status--healthy'
+                    : 'status status--waiting'
+                "
+              >
+                {{ gateOpen('ceremonyBroadcast') ? 'Open' : 'Closed' }}
+              </span>
+            </div>
+            <p>
+              A 15-minute window permits only the exact approved ceremony bundle. It cannot enable
+              minting, presales, or purchases.
+            </p>
+            <div class="inline-actions">
+              @if (!hasCurrentApproval('gate:ceremonyBroadcast')) {
+                <button type="button" class="btn btn--ghost" (click)="proposeLaunchWindow()">
+                  Review launch window
+                </button>
+              }
+              @if (
+                approval('gate:ceremonyBroadcast')?.approved &&
+                ownerSession() &&
+                !gateOpen('ceremonyBroadcast')
+              ) {
+                <button type="button" class="btn btn--primary" (click)="activateLaunchWindow()">
+                  Open approved window
+                </button>
+              }
+            </div>
+          </section>
+        }
+
+        @if (workspace()!.launch.state === 'locked') {
+          <section class="workspace-section" aria-labelledby="operation-windows-title">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">Owner plus one · 30 minutes</span>
+                <h2 id="operation-windows-title">Operational write windows</h2>
+              </div>
+              <button type="button" class="btn btn--primary" (click)="openOperations()">
+                Open operations dashboard
+              </button>
+            </div>
+            <p>
+              Drafting and review remain available. Each chain-writing operation opens separately,
+              closes automatically, and cannot override the server emergency lock.
+            </p>
+            <div class="operation-window-list">
+              @for (name of operationGateNames; track name) {
+                <article>
+                  <div>
+                    <strong>{{ gateLabel(name) }}</strong>
+                    <span>{{ gateHelp(name) }}</span>
+                  </div>
+                  <div>
+                    <span
+                      [class]="
+                        gateOpen(name)
+                          ? 'status status--healthy'
+                          : 'status status--waiting'
+                      "
+                    >
+                      {{ gateOpen(name) ? 'Open' : 'Closed' }}
+                    </span>
+                    @if (gateOpen(name)) {
+                      <small>Closes {{ formatTime(workspace()!.gates[name]?.closesAt) }}</small>
+                    }
+                  </div>
+                  <div class="inline-actions">
+                    @if (!hasCurrentApproval(gateAction(name))) {
+                      <button
+                        type="button"
+                        class="btn btn--ghost"
+                        [disabled]="!!pending() || gateOpen(name)"
+                        (click)="reviewOperationWindow(name)"
+                      >
+                        Review window
+                      </button>
+                    }
+                    @if (
+                      approval(gateAction(name))?.approved &&
+                      ownerSession() &&
+                      !gateOpen(name)
+                    ) {
+                      <button
+                        type="button"
+                        class="btn btn--primary"
+                        [disabled]="!!pending()"
+                        (click)="activateOperationWindow(name)"
+                      >
+                        Open approved window
+                      </button>
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+        }
+
+        @if (
+          !['broadcast', 'confirmed', 'artifact_pending', 'artifact_signed', 'locked', 'abandoned'].includes(
+            workspace()!.launch.state
+          )
+        ) {
+          <details class="workspace-section danger-zone">
+            <summary>Stop and archive this launch</summary>
+            <p>
+              Voluntary abandonment requires the owner and one coadministrator. It does not delete
+              the audit record and cannot be used after broadcast.
+            </p>
+            @if (ownerSession() && !approval('abandon')) {
+              <label>
+                <span>Reason for stopping</span>
+                <textarea
+                  [(ngModel)]="abandonmentReason"
+                  rows="3"
+                  placeholder="Explain the specific readiness or safety reason."
+                ></textarea>
+              </label>
+            }
+            <div class="inline-actions">
+              @if (
+                (ownerSession() || approval('abandon')) &&
+                !hasCurrentApproval('abandon')
+              ) {
+                <button
+                  type="button"
+                  class="btn btn--danger"
+                  [disabled]="!!pending()"
+                  (click)="reviewAbandonment()"
+                >
+                  Review stop request
+                </button>
+              }
+              @if (approval('abandon')?.approved && ownerSession()) {
+                <button
+                  type="button"
+                  class="btn btn--danger"
+                  [disabled]="!!pending()"
+                  (click)="executeAbandonment()"
+                >
+                  Stop and archive launch
+                </button>
+              }
+            </div>
+          </details>
+        }
+
+        <section id="launch-archive" class="workspace-section">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Read-only records</span>
+              <h2>Signed launch archive</h2>
+            </div>
+            <button type="button" class="btn btn--ghost" (click)="loadArchive()">Refresh</button>
+          </div>
+          @if (archive().length) {
+            <div class="archive-list">
+              @for (item of archive(); track item.ceremonyId) {
+                <article>
+                  <strong>{{
+                    item.state === 'locked' ? 'Completed launch' : 'Abandoned launch'
+                  }}</strong>
+                  <span>{{ formatTime(item.updatedAt) }}</span>
+                  <small>{{ item.network }}</small>
+                </article>
+              }
+            </div>
+          } @else {
+            <p>The completed ceremony will remain here as a signed, read-only record.</p>
+          }
+        </section>
+      </div>
+    </div>
+  }
+
+  @if (pendingDecision(); as decision) {
+    <div class="decision-backdrop" role="presentation">
+      <section
+        class="decision-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="decision-title"
+      >
+        <span class="eyebrow">Review before signing</span>
+        <h2 id="decision-title">{{ decisionReceipt()?.title }}</h2>
+        <dl>
+          <div>
+            <dt>Network</dt>
+            <dd>{{ decisionReceipt()?.network }}</dd>
+          </div>
+          <div>
+            <dt>Financial effect</dt>
+            <dd>{{ decisionReceipt()?.financialEffect }}</dd>
+          </div>
+          <div>
+            <dt>Customer impact</dt>
+            <dd>{{ decisionReceipt()?.customerImpact }}</dd>
+          </div>
+          <div>
+            <dt>Can it be undone?</dt>
+            <dd>{{ decisionReceipt()?.reversibility }}</dd>
+          </div>
+          <div>
+            <dt>Required approval</dt>
+            <dd>{{ decisionReceipt()?.requiredApprovers }}</dd>
+          </div>
+          @if (decisionReceipt()?.expectedResult) {
+            <div>
+              <dt>Expected result</dt>
+              <dd>{{ decisionReceipt()?.expectedResult }}</dd>
+            </div>
+          }
+        </dl>
+        <p class="wallet-review">
+          Your wallet will show a signature request for only this exact Testnet action.
+        </p>
+        <div class="decision-actions">
+          <button type="button" class="btn btn--ghost" (click)="cancelDecision()">Cancel</button>
+          <button
+            type="button"
+            class="btn btn--primary"
+            [disabled]="!!pending()"
+            (click)="confirmDecision()"
+          >
+            {{
+              decision.kind === 'broadcast'
+                ? 'Launch Testnet protocol'
+                : decision.kind === 'rehearsal-payment'
+                  ? 'Submit test purchase'
+                  : 'Approve exact action'
+            }}
+          </button>
+        </div>
+      </section>
+    </div>
+  }
+</main>

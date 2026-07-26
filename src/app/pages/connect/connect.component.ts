@@ -121,7 +121,7 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="card p-4">
           <div class="mono text-[0.68rem] uppercase tracking-[0.18em] text-brand">3 · Execute</div>
-          <p class="mt-2">Proceed to Moon alpha simulations and committee-gated actions.</p>
+          <p class="mt-2">Proceed to 127 Eastmoreland testnet preview and committee-gated actions.</p>
         </div>
       </div>
 

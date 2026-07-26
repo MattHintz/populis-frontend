@@ -5,10 +5,18 @@ describe('admin portal route boundary', () => {
     expect(routes.some((route) => route.path === 'admin/genesis')).toBeTrue();
   });
 
-  it('exposes the pre-ceremony Safe ownership handoff without a chain-admin guard', () => {
+  it('keeps the standalone Safe evidence page behind administrator auth', () => {
     const route = routes.find((candidate) => candidate.path === 'admin/omnichain-activation');
     expect(route).toBeDefined();
-    expect(route?.canActivate).toBeUndefined();
+    expect(route?.canActivate).toBeDefined();
+  });
+
+  it('routes the admin home to the consolidated operations dashboard', () => {
+    const route = routes.find((candidate) => candidate.path === 'admin');
+    expect(route).toBeDefined();
+    expect(route?.canActivate).toBeDefined();
+    expect(routes.some((candidate) => candidate.path === 'admin/sales')).toBeTrue();
+    expect(routes.some((candidate) => candidate.path === 'admin/system-health')).toBeTrue();
   });
 
   it('does not expose retired one-off bootstrap or authority launch screens', () => {

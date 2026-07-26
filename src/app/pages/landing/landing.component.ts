@@ -34,7 +34,7 @@ import { ChiaWasmService } from '../../services/chia-wasm.service';
         </h1>
         <p class="mt-8 text-lg md:text-xl text-text-muted leading-relaxed max-w-2xl">
           One command surface for Vault custody, Committee Coin voting,
-          identity readiness, Moon alpha simulation, and operator checks. The
+          identity readiness, the 127 Eastmoreland testnet preview, and operator checks. The
           market stays on Solslot; this console carries the protocol work
           underneath it.
         </p>
