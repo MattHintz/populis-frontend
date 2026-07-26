@@ -34,6 +34,16 @@ export class CollectionApiService {
     );
   }
 
+  convertDisplayUnits(request: CollectionDisplayUnitRequest): Promise<CollectionDisplayUnitConversion> {
+    return firstValueFrom(
+      this.http.post<CollectionDisplayUnitConversion>(
+        `${this.base}/admin/collections/display-units/convert`,
+        request,
+        { headers: this.headers() },
+      ),
+    );
+  }
+
   list(options: { state?: CollectionState; owner?: string } = {}): Promise<CollectionListResponse> {
     const query = new URLSearchParams();
     if (options.state) query.set('state', options.state);
@@ -46,11 +56,11 @@ export class CollectionApiService {
     );
   }
 
-  create(collectionId: string, title: string): Promise<CollectionWorkspace> {
+  create(title: string): Promise<CollectionWorkspace> {
     return firstValueFrom(
       this.http.post<CollectionWorkspace>(
         `${this.base}/admin/collections`,
-        { collectionId, title },
+        { title },
         { headers: this.headers() },
       ),
     );
@@ -220,7 +230,16 @@ export class CollectionApiService {
     return firstValueFrom(
       this.http.get<PresaleSeries>(
         `${this.base}/presales/admin/${encodeURIComponent(identifier)}`,
+        { headers: this.headers() },
       ),
+    );
+  }
+
+  listPresales(): Promise<PresaleSeries[]> {
+    return firstValueFrom(
+      this.http.get<PresaleSeries[]>(`${this.base}/presales/admin`, {
+        headers: this.headers(),
+      }),
     );
   }
 
@@ -323,6 +342,29 @@ export interface CollectionProfiles {
     byProgramOverlay: Record<string, string[]>;
   };
   legalRight: 'future-sale-or-refinance-proceeds';
+}
+
+export interface CollectionDisplayUnitRequest {
+  money: Record<string, string>;
+  percentages: Record<string, string>;
+  ownershipShares: Record<string, string>;
+  deriveXchPar: boolean;
+}
+
+export interface CollectionDisplayUnitConversion {
+  moneyMinor: Record<string, string>;
+  percentageBps: Record<string, string>;
+  ownershipPpm: Record<string, number>;
+  governanceQuorum: string;
+  xchParMojos: {
+    collection: string;
+    deeds: Record<string, string>;
+  } | null;
+  xchOracle: {
+    priceUsdMinorPerXch: string;
+    validUntil: number;
+    roundHash: string;
+  } | null;
 }
 
 export interface CollectionReadinessIssue {

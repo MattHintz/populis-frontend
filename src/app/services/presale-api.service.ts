@@ -1,7 +1,8 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { AdminSessionService } from './admin-session.service';
 
 export type PresalePhase = 'PRESALE' | 'LIVE' | 'CANCELED';
 export type VoucherPaymentRail = 'BASE_SEPOLIA_USDC' | 'CHIA_XCH';
@@ -52,16 +53,22 @@ export interface VoucherPurchaseRequest {
 @Injectable({ providedIn: 'root' })
 export class PresaleApiService {
   private readonly http = inject(HttpClient);
+  private readonly session = inject(AdminSessionService);
   private readonly base = environment.faucetApi;
 
   list(): Promise<PresaleSeries[]> {
-    return firstValueFrom(this.http.get<PresaleSeries[]>(`${this.base}/presales/admin`));
+    return firstValueFrom(
+      this.http.get<PresaleSeries[]>(`${this.base}/presales/admin`, {
+        headers: this.authHeaders(),
+      }),
+    );
   }
 
   get(termsHash: string): Promise<PresaleSeries> {
     return firstValueFrom(
       this.http.get<PresaleSeries>(
         `${this.base}/presales/admin/${encodeURIComponent(termsHash)}`,
+        { headers: this.authHeaders() },
       ),
     );
   }
@@ -79,5 +86,9 @@ export class PresaleApiService {
         params: { chain_evidence_id: chainEvidenceId },
       }),
     );
+  }
+
+  private authHeaders(): HttpHeaders {
+    return new HttpHeaders({ Authorization: `Bearer ${this.session.requireJwt()}` });
   }
 }

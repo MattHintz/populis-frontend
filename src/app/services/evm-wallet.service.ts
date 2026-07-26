@@ -19,10 +19,7 @@ const WALLET_CONNECT_PROMPT_TIMEOUT_MS = 45_000;
 const WALLET_CONNECT_REQUEST_EXPIRY_SECONDS = 300;
 const EVM_SIGNATURE_PROMPT_TIMEOUT_MS = 180_000;
 const EVM_WALLETCONNECT_STORAGE_PREFIX = 'solslot-admin-v2';
-const EVM_WALLETCONNECT_SIGNING_METHODS = [
-  'eth_signTypedData',
-  'eth_signTypedData_v4',
-];
+const EVM_WALLETCONNECT_SIGNING_METHODS = ['eth_signTypedData', 'eth_signTypedData_v4'];
 const EVM_WALLETCONNECT_TRANSACTION_METHOD = 'eth_sendTransaction';
 const EVM_WALLETCONNECT_REQUIRED_CHAIN_ID = environment.eip712ChainId;
 const BASE_SEPOLIA_CHAIN_ID = 84532;
@@ -116,7 +113,7 @@ export class EvmWalletService {
     if (!projectId) {
       throw new Error(
         'WalletConnect projectId is not configured.  Set environment.walletConnectProjectId ' +
-          'to a value from https://cloud.walletconnect.com'
+          'to a value from https://cloud.walletconnect.com',
       );
     }
     const optionalChainsMode = normalizeOptionalChainsMode(options.optionalChains);
@@ -160,7 +157,10 @@ export class EvmWalletService {
       WALLET_CONNECT_PROMPT_TIMEOUT_MS,
       'WalletConnect did not respond. Close the modal, then retry with a fresh QR code.',
     );
-    this.debugWalletConnect('connect:provider-connect-resolved', this.walletConnectSessionDebugInfo());
+    this.debugWalletConnect(
+      'connect:provider-connect-resolved',
+      this.walletConnectSessionDebugInfo(),
+    );
     const accounts = provider.accounts || [];
     if (accounts.length === 0) {
       throw new Error('WalletConnect returned no accounts');
@@ -334,10 +334,7 @@ export class EvmWalletService {
    * the Safe address, chain, primary type, field list, and message shape are
    * all checked at this boundary.
    */
-  async signSafeMessage(
-    typedData: Eip712TypedData,
-    expectedSafe: string,
-  ): Promise<string> {
+  async signSafeMessage(typedData: Eip712TypedData, expectedSafe: string): Promise<string> {
     const domain = typedData.domain;
     const safe = getAddress(expectedSafe);
     const domainKeys = Object.keys(domain).sort();
@@ -351,14 +348,98 @@ export class EvmWalletService {
       JSON.stringify(domainKeys) !== JSON.stringify(['chainId', 'verifyingContract']) ||
       JSON.stringify(typeKeys) !== JSON.stringify(['SafeMessage']) ||
       typedData.primaryType !== 'SafeMessage' ||
-      JSON.stringify(safeTypes) !==
-        JSON.stringify([{ name: 'message', type: 'bytes' }]) ||
+      JSON.stringify(safeTypes) !== JSON.stringify([{ name: 'message', type: 'bytes' }]) ||
       JSON.stringify(messageKeys) !== JSON.stringify(['message']) ||
       !isHexString(String(typedData.message['message']))
     ) {
       throw new Error('Refusing altered Base Sepolia SafeMessage approval data.');
     }
     return this.signTypedDataOnChain(typedData, BASE_SEPOLIA_CHAIN_ID);
+  }
+
+  /**
+   * Sign an RC21 launch resume or action approval.
+   *
+   * This is intentionally separate from the general protocol signer. The
+   * browser validates the complete EIP-712 shape before a wallet prompt is
+   * shown so a compromised launch view cannot turn this into an arbitrary
+   * typed-data signing surface.
+   */
+  async signLaunchAction(typedData: Eip712TypedData): Promise<string> {
+    const address = this.address();
+    if (!this.eip1193 || !address) throw new Error('Connect the administrator wallet first.');
+
+    const domain = typedData.domain;
+    const domainFields = [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+    ];
+    const resumeFields = [
+      { name: 'ceremonyId', type: 'bytes32' },
+      { name: 'slot', type: 'uint8' },
+      { name: 'wallet', type: 'address' },
+      { name: 'nonce', type: 'bytes32' },
+      { name: 'expiresAt', type: 'uint64' },
+    ];
+    const actionFields = [
+      { name: 'ceremonyId', type: 'bytes32' },
+      { name: 'actionType', type: 'string' },
+      { name: 'actionId', type: 'bytes32' },
+      { name: 'payloadHash', type: 'bytes32' },
+      { name: 'expiresAt', type: 'uint64' },
+    ];
+    const primaryType = typedData.primaryType;
+    const expectedFields =
+      primaryType === 'SolslotLaunchResume'
+        ? resumeFields
+        : primaryType === 'SolslotLaunchAction'
+          ? actionFields
+          : null;
+    const expectedMessageKeys =
+      primaryType === 'SolslotLaunchResume'
+        ? ['ceremonyId', 'expiresAt', 'nonce', 'slot', 'wallet']
+        : ['actionId', 'actionType', 'ceremonyId', 'expiresAt', 'payloadHash'];
+    const typeKeys = Object.keys(typedData.types).sort();
+    const messageKeys = Object.keys(typedData.message).sort();
+    if (
+      !expectedFields ||
+      domain.name !== 'Solslot Alpha Launch' ||
+      domain.version !== '21' ||
+      Number(domain.chainId) !== environment.eip712ChainId ||
+      JSON.stringify(Object.keys(domain).sort()) !==
+        JSON.stringify(['chainId', 'name', 'version']) ||
+      JSON.stringify(typeKeys) !== JSON.stringify(['EIP712Domain', primaryType].sort()) ||
+      JSON.stringify(typedData.types['EIP712Domain']) !== JSON.stringify(domainFields) ||
+      JSON.stringify(typedData.types[primaryType]) !== JSON.stringify(expectedFields) ||
+      JSON.stringify(messageKeys) !== JSON.stringify(expectedMessageKeys) ||
+      !isHexString(String(typedData.message['ceremonyId']), 32) ||
+      !Number.isSafeInteger(Number(typedData.message['expiresAt']))
+    ) {
+      throw new Error('Refusing altered RC21 launch approval data.');
+    }
+
+    if (primaryType === 'SolslotLaunchResume') {
+      const slot = Number(typedData.message['slot']);
+      const wallet = getAddress(String(typedData.message['wallet']));
+      if (
+        slot < 1 ||
+        slot > 3 ||
+        !Number.isInteger(slot) ||
+        wallet !== getAddress(address) ||
+        !isHexString(String(typedData.message['nonce']), 32)
+      ) {
+        throw new Error('Refusing an RC21 resume request for another administrator.');
+      }
+    } else if (
+      !String(typedData.message['actionType']).trim() ||
+      !isHexString(String(typedData.message['actionId']), 32) ||
+      !isHexString(String(typedData.message['payloadHash']), 32)
+    ) {
+      throw new Error('Refusing an incomplete RC21 launch action.');
+    }
+
+    return this.signTypedDataOnChain(typedData, environment.eip712ChainId);
   }
 
   /**
@@ -445,7 +526,7 @@ export class EvmWalletService {
     const signature = await signer.signTypedData(
       typedData.domain as unknown as Record<string, unknown>,
       signingTypes,
-      typedData.message
+      typedData.message,
     );
     return signature;
   }
@@ -481,7 +562,7 @@ export class EvmWalletService {
         chain,
         address: redactAddress(address),
       });
-      return await withWalletPromptTimeout(
+      return (await withWalletPromptTimeout(
         this.requestWalletConnectChain(
           {
             method: 'eth_signTypedData_v4',
@@ -492,7 +573,7 @@ export class EvmWalletService {
         ),
         EVM_SIGNATURE_PROMPT_TIMEOUT_MS,
         timeoutMessage,
-      ) as string;
+      )) as string;
     } catch (e) {
       this.debugWalletConnect('typed-data:walletconnect-chain-error', {
         method: 'eth_signTypedData_v4',
@@ -508,7 +589,7 @@ export class EvmWalletService {
       chain,
       address: redactAddress(address),
     });
-    return await withWalletPromptTimeout(
+    return (await withWalletPromptTimeout(
       this.requestWalletConnectChain(
         {
           method: 'eth_signTypedData',
@@ -519,7 +600,7 @@ export class EvmWalletService {
       ),
       EVM_SIGNATURE_PROMPT_TIMEOUT_MS,
       timeoutMessage,
-    ) as string;
+    )) as string;
   }
 
   /**
@@ -532,9 +613,7 @@ export class EvmWalletService {
     const hexChain = '0x' + targetChainId.toString(16);
     let currentHex: string | null = null;
     try {
-      currentHex = normalizeChainIdHex(
-        await this.eip1193.request({ method: 'eth_chainId' }),
-      );
+      currentHex = normalizeChainIdHex(await this.eip1193.request({ method: 'eth_chainId' }));
     } catch {}
     if (currentHex && currentHex.toLowerCase() === hexChain.toLowerCase()) return;
 
@@ -551,7 +630,7 @@ export class EvmWalletService {
           `this Solslot EIP-712 signature is bound to that chain id. ` +
           `This does NOT send any transaction and costs nothing. (${
             (err as Error).message ?? 'switch rejected'
-          })`
+          })`,
       );
     }
   }
@@ -572,7 +651,7 @@ export class EvmWalletService {
     const digest = TypedDataEncoder.hash(
       typedData.domain as unknown as Record<string, unknown>,
       signingTypes,
-      typedData.message
+      typedData.message,
     );
     const uncompressedHex = SigningKey.recoverPublicKey(digest, signature);
     return compressSecp256k1Pubkey(uncompressedHex);
@@ -590,7 +669,7 @@ export class EvmWalletService {
     const digest = TypedDataEncoder.hash(
       typedData.domain as unknown as Record<string, unknown>,
       signingTypes,
-      typedData.message
+      typedData.message,
     );
     return recoverCompressedPubkeyFromDigestForAddress(digest, signature, expectedAddress);
   }
@@ -806,13 +885,15 @@ function evmWalletDebug(event: string, details: Record<string, unknown> = {}): v
 }
 
 function debugErrorInfo(e: unknown): Record<string, unknown> {
-  const record = e && typeof e === 'object' ? e as Record<string, unknown> : {};
-  const nestedError = record['error'] && typeof record['error'] === 'object'
-    ? record['error'] as Record<string, unknown>
-    : null;
-  const payload = record['payload'] && typeof record['payload'] === 'object'
-    ? record['payload'] as Record<string, unknown>
-    : null;
+  const record = e && typeof e === 'object' ? (e as Record<string, unknown>) : {};
+  const nestedError =
+    record['error'] && typeof record['error'] === 'object'
+      ? (record['error'] as Record<string, unknown>)
+      : null;
+  const payload =
+    record['payload'] && typeof record['payload'] === 'object'
+      ? (record['payload'] as Record<string, unknown>)
+      : null;
   return {
     name: record['name'] ?? null,
     code: record['code'] ?? null,
@@ -884,7 +965,7 @@ function summarizeWalletConnectEvent(event: unknown): Record<string, unknown> {
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' ? value as Record<string, unknown> : null;
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
 }
 
 function debugWalletConnectNamespaces(
@@ -993,7 +1074,9 @@ function recoverCompressedPubkeyFromDigestForAddress(
   const uncompressedHex = SigningKey.recoverPublicKey(getBytes(digest), signature);
   const recoveredAddress = getAddress(computeAddress(uncompressedHex));
   if (recoveredAddress !== getAddress(expectedAddress)) {
-    throw new Error('Wallet signature recovered a different EVM address than the connected wallet.');
+    throw new Error(
+      'Wallet signature recovered a different EVM address than the connected wallet.',
+    );
   }
   return compressSecp256k1Pubkey(uncompressedHex);
 }
@@ -1055,7 +1138,10 @@ function evmWalletConnectRpcMap(
   mode: EvmWalletConnectOptions['optionalChains'] = 'solslot',
 ): Record<number, string> {
   const rpcMap: Record<number, string> = {};
-  for (const chainId of [evmWalletConnectRequiredChainId(), ...evmWalletConnectOptionalChainIds(mode)]) {
+  for (const chainId of [
+    evmWalletConnectRequiredChainId(),
+    ...evmWalletConnectOptionalChainIds(mode),
+  ]) {
     const rpcUrl = EVM_WALLETCONNECT_KNOWN_RPC_MAP[chainId];
     if (rpcUrl) rpcMap[chainId] = rpcUrl;
   }

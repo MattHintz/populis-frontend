@@ -116,7 +116,7 @@ type DossierTab = 'overview' | 'economics' | 'legal' | 'documents' | 'updates' |
             <div class="section-heading"><span class="section-label">SmartDeed plan</span><h2>Allocation</h2></div>
             <div class="allocation-table">
               @for (deed of dossier().deedAllocation; track deed.deedId || $index) {
-                <div><strong class="mono">{{ deed.deedId || 'ID pending' }}</strong><span>{{ share(deed.sharePpm) }}</span><span class="mono">{{ deed.parValueMojos || 'Par pending' }} mojos</span></div>
+                <div><strong class="mono">{{ deed.deedId || 'ID pending' }}</strong><span>{{ share(deed.sharePpm) }}</span><span>{{ deedPrice(deed.sharePpm) }}</span></div>
               }
             </div>
           </section>
@@ -341,6 +341,19 @@ export class PropertyDossierComponent {
 
   share(ppm: number | undefined): string {
     return ppm === undefined ? 'Share pending' : `${(ppm / 10_000).toFixed(2)}%`;
+  }
+
+  deedPrice(ppm: number | undefined): string {
+    const target = this.dossier().offering?.targetRaiseMinor;
+    const feeBps = this.dossier().offering?.royaltyBps;
+    if (ppm === undefined || !target || !/^\d+$/.test(target) || !feeBps || !/^\d+$/.test(feeBps)) {
+      return 'Price pending';
+    }
+    const numerator = BigInt(target) * BigInt(ppm);
+    if (numerator % 1_000_000n) return 'Price pending';
+    const base = numerator / 1_000_000n;
+    const fee = (base * BigInt(feeBps) + 9_999n) / 10_000n;
+    return this.money(String(base + fee), this.dossier().offering?.currency);
   }
 
   fileSize(bytes: number): string {

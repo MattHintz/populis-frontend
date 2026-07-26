@@ -2,80 +2,156 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
-import { AdminGenesisService, GenesisCeremony } from '../../../services/admin-genesis.service';
+import {
+  AdminLaunchService,
+  LaunchWorkspace,
+} from '../../../services/admin-launch.service';
 import { EvmWalletService } from '../../../services/evm-wallet.service';
 import { GenesisComponent } from './genesis.component';
 
 describe('GenesisComponent', () => {
-  const ceremonyId = '0x' + '11'.repeat(32);
+  const walletAddress = `0x${'ab'.repeat(20)}`;
+  const ceremonyId = `0x${'11'.repeat(32)}`;
   const typedData = {
     domain: { name: 'Solslot Protocol', version: '2', chainId: 11155111 },
     types: {},
-    primaryType: 'SolslotGenesisPlan',
+    primaryType: 'SolslotLaunchAction',
     message: {},
   };
-  const baseCeremony = (state = 'draft'): GenesisCeremony => ({
-    ceremony_id: ceremonyId,
-    state,
-    network: 'testnet11',
-    evm_chain_id: 11155111,
-    source_shas: {
-      protocol: '1'.repeat(40),
-      evm: '2'.repeat(40),
-      omnichain: '3'.repeat(40),
-      api: '4'.repeat(40),
-      legacyBackend: '5'.repeat(40),
-      keyOfSolomon: '6'.repeat(40),
-      samuel: '7'.repeat(40),
-      customerWeb: '8'.repeat(40),
-      adminPortal: '9'.repeat(40),
-    },
-    invitations: [1, 2, 3].map((slot) => ({ slot })),
-    plan_signatures: [],
-    artifact_signatures: [],
-  });
+  const address = signal<string | null>(null);
 
   let fixture: ComponentFixture<GenesisComponent>;
   let component: GenesisComponent;
-  let genesis: jasmine.SpyObj<AdminGenesisService>;
-  const walletAddress = signal<string | null>(null);
-  const wallet = {
-    address: walletAddress,
-    connectInjected: jasmine.createSpy('connectInjected'),
-    connectWalletConnect: jasmine.createSpy('connectWalletConnect'),
-    signTypedData: jasmine.createSpy('signTypedData'),
+  let launch: jasmine.SpyObj<AdminLaunchService>;
+  let wallet: {
+    address: typeof address;
+    connectInjected: jasmine.Spy;
+    connectWalletConnect: jasmine.Spy;
+    disconnect: jasmine.Spy;
+    signTypedData: jasmine.Spy;
+    signLaunchAction: jasmine.Spy;
+    signSafeMessage: jasmine.Spy;
+    sendBaseSepoliaTransaction: jasmine.Spy;
   };
 
+  function workspace(state = 'roster_open'): LaunchWorkspace {
+    return {
+      session: {
+        authenticated: true,
+        slot: 1,
+        role: 'owner',
+        wallet: walletAddress,
+        expiresAt: 1_900_000_000,
+      },
+      launch: {
+        ceremonyId,
+        state,
+        network: 'testnet11',
+        createdAt: 1_800_000_000,
+        updatedAt: 1_800_000_001,
+        administrators: [
+          { slot: 1, role: 'owner', enrolled: true, wallet: walletAddress },
+          { slot: 2, role: 'coadmin', enrolled: false },
+          { slot: 3, role: 'coadmin', enrolled: false },
+        ],
+        planSignatureSlots: [],
+        artifactSignatureSlots: [],
+      },
+      readiness: [
+        {
+          id: 'release',
+          title: 'Reviewed RC21 release',
+          status: 'Healthy',
+          impact: 'The exact release evidence matches this server.',
+          assignedRole: 'system',
+        },
+        {
+          id: 'funding',
+          title: 'Ceremony funding',
+          status: 'Waiting',
+          impact: 'The fixed nine-output transaction has not been created.',
+          assignedRole: 'owner',
+        },
+      ],
+      nextTask: {
+        title: 'Enroll the administrator team',
+        body: 'Create private links for Admin 2 and Admin 3.',
+        assignedRole: 'owner',
+        action: 'enrollment',
+      },
+      gates: {},
+      actionApprovals: {},
+      notice: 'TESTNET, NO REAL INVESTMENT OR LEGAL RIGHT.',
+    };
+  }
+
   beforeEach(async () => {
-    genesis = jasmine.createSpyObj<AdminGenesisService>('AdminGenesisService', [
-      'createDraft',
-      'getCeremony',
-      'issueInvitation',
+    launch = jasmine.createSpyObj<AdminLaunchService>('AdminLaunchService', [
+      'publicStatus',
+      'claimOwner',
       'prepareInvitation',
+      'reissueOwnerEnrollment',
       'acceptInvitation',
+      'resumeChallenge',
+      'resumeLogin',
+      'logout',
+      'workspace',
+      'issueInvitation',
       'freezeRoster',
-      'createPlan',
+      'railOwnership',
+      'signRailOwnership',
+      'recordRailOwnershipBroadcast',
+      'settlementRehearsal',
+      'startSettlementRehearsal',
+      'submitSettlementRehearsalTransaction',
+      'prepareFunding',
+      'executeFunding',
+      'confirmFunding',
+      'proposeGate',
+      'prepareAction',
+      'approveAction',
+      'activateGate',
+      'buildPlan',
       'preparePlanSignature',
       'signPlan',
       'preflight',
       'broadcast',
-      'confirm',
-      'createArtifact',
+      'progress',
       'prepareArtifactSignature',
       'signArtifact',
-      'finalize',
-      'abandon',
+      'archive',
     ]);
-    walletAddress.set(null);
-    wallet.connectInjected.calls.reset();
-    wallet.connectWalletConnect.calls.reset();
-    wallet.signTypedData.calls.reset();
+    launch.publicStatus.and.resolveTo({
+      enabled: true,
+      network: 'testnet11',
+      title: 'Alpha Protocol Launch',
+      notice: 'Testnet only',
+    });
+    launch.workspace.and.rejectWith(new Error('not signed in'));
+    launch.railOwnership.and.rejectWith(new Error('not available'));
+    launch.settlementRehearsal.and.rejectWith(new Error('not available'));
+
+    address.set(null);
+    wallet = {
+      address,
+      connectInjected: jasmine.createSpy('connectInjected').and.resolveTo(walletAddress),
+      connectWalletConnect: jasmine
+        .createSpy('connectWalletConnect')
+        .and.resolveTo(walletAddress),
+      disconnect: jasmine.createSpy('disconnect').and.resolveTo(),
+      signTypedData: jasmine.createSpy('signTypedData').and.resolveTo('0xsigned'),
+      signLaunchAction: jasmine.createSpy('signLaunchAction').and.resolveTo('0xresume'),
+      signSafeMessage: jasmine.createSpy('signSafeMessage').and.resolveTo('0xsafe'),
+      sendBaseSepoliaTransaction: jasmine
+        .createSpy('sendBaseSepoliaTransaction')
+        .and.resolveTo(`0x${'33'.repeat(32)}`),
+    };
 
     await TestBed.configureTestingModule({
       imports: [GenesisComponent],
       providers: [
         provideRouter([]),
-        { provide: AdminGenesisService, useValue: genesis },
+        { provide: AdminLaunchService, useValue: launch },
         { provide: EvmWalletService, useValue: wallet },
       ],
     }).compileComponents();
@@ -83,118 +159,194 @@ describe('GenesisComponent', () => {
     fixture = TestBed.createComponent(GenesisComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
   });
 
-  it('renders the complete V2 ceremony gate instead of the retired deploy flow', () => {
+  it('shows a neutral wallet sign-in without ceremony identifiers or raw protocol inputs', () => {
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toContain('Genesis ceremony console');
-    expect(text).toContain('Three independent wallet slots');
-    expect(text).toContain('Pre-broadcast gate');
-    expect(text).toContain('Post-chain artifact quorum');
-    expect(text).toContain('Write lock last');
-    expect(text).not.toContain('admin slot 0');
-    expect(text).not.toContain('deployment_manifest.json');
+    expect(text).toContain('Alpha Protocol Launch');
+    expect(text).toContain('Connect an enrolled administrator wallet');
+    expect(text).toContain('Sign in with browser wallet');
+    expect(text).not.toContain('bearer token');
+    expect(text).not.toContain('Source SHA');
+    expect(text).not.toContain('Plan JSON');
+    expect(text).not.toContain(ceremonyId);
   });
 
-  it('creates a draft only from all five frozen source commits', async () => {
-    genesis.createDraft.and.resolveTo(baseCeremony());
-    component.tokenInput.set('operator-token');
-    component.sourceShasJson.set(JSON.stringify(baseCeremony().source_shas));
-
-    await component.createDraft();
-
-    expect(genesis.createDraft).toHaveBeenCalledOnceWith(
-      'operator-token',
-      baseCeremony().source_shas,
-    );
-    expect(component.ceremonyIdInput()).toBe(ceremonyId);
-    expect(component.message()).toContain('five frozen commits');
-  });
-
-  it('enrolls an invited administrator with the connected wallet signature', async () => {
-    const address = '0x' + 'ab'.repeat(20);
-    walletAddress.set(address);
-    wallet.signTypedData.and.resolveTo('0xsigned');
-    genesis.prepareInvitation.and.resolveTo({
-      ceremonyId,
-      slot: 2,
-      expiresAt: 1234,
+  it('resumes the active launch from the connected wallet and maps the role automatically', async () => {
+    const current = workspace();
+    launch.resumeChallenge.and.resolveTo({
+      nonce: 'resume-nonce',
+      expiresAt: 1_900_000_000,
       typedData,
     });
-    genesis.acceptInvitation.and.resolveTo({
+    launch.resumeLogin.and.resolveTo(current.session);
+    launch.workspace.and.resolveTo(current);
+
+    await component.signIn('injected');
+    fixture.detectChanges();
+
+    expect(wallet.connectInjected).toHaveBeenCalled();
+    expect(wallet.signLaunchAction).toHaveBeenCalledOnceWith(typedData);
+    expect(launch.resumeLogin).toHaveBeenCalledOnceWith(
+      walletAddress,
+      'resume-nonce',
+      '0xresume',
+    );
+    expect(fixture.nativeElement.textContent).toContain(
+      'Signed in as Owner, Administrator 1',
+    );
+    expect(fixture.nativeElement.textContent).not.toContain('Select slot');
+  });
+
+  it('enrolls the owner into slot 1 from a one-time secure link', async () => {
+    component.ownerToken.set('private-owner-token');
+    component.ownerName = 'Owner Admin';
+    launch.claimOwner.and.resolveTo({
+      claimed: true,
       ceremonyId,
-      slot: 2,
-      enrolled: true,
-      state: 'roster_open',
+      ownerEnrollmentToken: 'owner-enrollment-token',
+      enrollmentExpiresAt: 1_900_000_000,
+      sessionExpiresAt: 1_900_000_000,
     });
-    component.invitationTokenInput.set('fragment-token');
+    launch.prepareInvitation.and.resolveTo({
+      ceremonyId,
+      slot: 1,
+      expiresAt: 1_900_000_000,
+      typedData,
+    });
+    launch.acceptInvitation.and.resolveTo();
+    launch.resumeChallenge.and.resolveTo({
+      nonce: 'resume-nonce',
+      expiresAt: 1_900_000_000,
+      typedData,
+    });
+    launch.resumeLogin.and.resolveTo(workspace().session);
+    launch.workspace.and.resolveTo(workspace());
 
-    await component.acceptInvitation();
+    await component.claimOwner('injected');
 
-    expect(genesis.prepareInvitation).toHaveBeenCalledOnceWith('fragment-token', address);
-    expect(wallet.signTypedData).toHaveBeenCalledOnceWith(typedData);
-    expect(genesis.acceptInvitation).toHaveBeenCalledOnceWith(
-      'fragment-token',
-      address,
+    expect(launch.claimOwner).toHaveBeenCalledOnceWith({
+      token: 'private-owner-token',
+      displayName: 'Owner Admin',
+      email: undefined,
+      timezone: component.timezone,
+    });
+    expect(launch.acceptInvitation).toHaveBeenCalledOnceWith(
+      'owner-enrollment-token',
+      walletAddress,
       '0xsigned',
     );
-    expect(component.ceremonyIdInput()).toBe(ceremonyId);
+    expect(component.workspace()?.session.slot).toBe(1);
   });
 
-  it('recovers the hash-only plan envelope and records a slot-bound signature', async () => {
-    const planned = { ...baseCeremony('plan_ready'), plan_hash: '0x' + '22'.repeat(32) };
-    const approved = {
-      ...planned,
-      state: 'plan_approved',
-      plan_signatures: [{ slot: 1, compressed_pubkey: '0x02', signature: '0xsigned' }],
-    };
-    component.ceremony.set(planned);
-    component.signerSlotInput.set(1);
-    walletAddress.set('0x' + 'ab'.repeat(20));
-    wallet.signTypedData.and.resolveTo('0xsigned');
-    genesis.preparePlanSignature.and.resolveTo({ ceremonyId, slot: 1, typedData });
-    genesis.signPlan.and.resolveTo(approved);
-
-    await component.signPlan();
-
-    expect(genesis.preparePlanSignature).toHaveBeenCalledOnceWith(ceremonyId, 1);
-    expect(wallet.signTypedData).toHaveBeenCalledOnceWith(typedData);
-    expect(genesis.signPlan).toHaveBeenCalledOnceWith(ceremonyId, 1, '0xsigned');
-    expect(component.ceremony()?.state).toBe('plan_approved');
-  });
-
-  it('will not broadcast until a reviewed preflight is explicitly armed', async () => {
-    component.ceremony.set(baseCeremony('plan_approved'));
-    component.tokenInput.set('operator-token');
-    genesis.preflight.and.resolveTo({
-      ready: true,
-      ceremonyId,
-      planHash: '0x' + '22'.repeat(32),
-      spendBundleId: '0x' + '33'.repeat(32),
-      spendCount: 48,
-      reviewClass: 'internal-engineering-testnet',
-      auditStatus: 'unaudited',
-      auditApprovalHash: '0x' + '44'.repeat(32),
+  it('prepares only the fixed nine-output funding receipt with the 530-mojo bridge input', async () => {
+    launch.workspace.and.resolveTo(workspace());
+    const outputs = [
+      { name: 'adminAuthority', amount: 1, coinId: `0x${'01'.repeat(32)}` },
+      { name: 'bridgeBatch', amount: 530, coinId: `0x${'02'.repeat(32)}` },
+      { name: 'did', amount: 1, coinId: `0x${'03'.repeat(32)}` },
+      { name: 'governance', amount: 1, coinId: `0x${'04'.repeat(32)}` },
+      { name: 'navRegistry', amount: 1, coinId: `0x${'05'.repeat(32)}` },
+      { name: 'pool', amount: 1, coinId: `0x${'06'.repeat(32)}` },
+      { name: 'protocolConfig', amount: 1, coinId: `0x${'07'.repeat(32)}` },
+      { name: 'sgt', amount: 1_000_022, coinId: `0x${'08'.repeat(32)}` },
+      { name: 'vaultVersionRegistry', amount: 1, coinId: `0x${'09'.repeat(32)}` },
+    ];
+    launch.prepareFunding.and.resolveTo({
+      receipt: {
+        plan: {
+          sourceCoinId: `0x${'44'.repeat(32)}`,
+          sourceAmount: 2_000_000,
+          fee: 0,
+          outputs,
+          fundingCoinIds: Object.fromEntries(
+            outputs.map((output) => [output.name, output.coinId]),
+          ),
+          changeAmount: 999_442,
+        },
+        planHash: `0x${'55'.repeat(32)}`,
+        state: 'prepared',
+        createdAt: 1_800_000_000,
+        updatedAt: 1_800_000_000,
+      },
+      summary: {
+        sourceBalanceMojos: 2_000_000,
+        totalMojos: 1_000_558,
+        feeMojos: 0,
+        outputs: outputs.map((output) => ({
+          purpose: output.name,
+          amountMojos: output.amount,
+        })),
+        bridgeBatchMojos: 530,
+        customizationAllowed: false,
+      },
     });
 
-    await component.broadcast();
-    expect(genesis.broadcast).not.toHaveBeenCalled();
+    await component.prepareFunding();
+    fixture.detectChanges();
 
-    await component.runPreflight();
-    expect(component.broadcastArmed()).toBeFalse();
-    component.broadcastArmed.set(true);
-    spyOn(window, 'confirm').and.returnValue(false);
-    await component.broadcast();
-    expect(genesis.broadcast).not.toHaveBeenCalled();
+    expect(component.fundingPreparation()?.summary.customizationAllowed).toBeFalse();
+    expect(component.fundingPreparation()?.summary.bridgeBatchMojos).toBe(530);
+    expect(component.fundingReceipt()?.plan.outputs.length).toBe(9);
+    expect(fixture.nativeElement.textContent).toContain('1,000,558 mojos');
+    expect(fixture.nativeElement.textContent).toContain('cannot be edited');
   });
 
-  it('keeps malformed operator JSON fail-closed', async () => {
-    component.sourceShasJson.set('{bad json');
-    component.tokenInput.set('operator-token');
+  it('keeps final broadcast behind an approved, open ceremony-only window', async () => {
+    const current = workspace('plan_approved');
+    current.nextTask = {
+      title: 'Prepare final launch',
+      body: 'Open the bounded broadcast window.',
+      assignedRole: 'owner',
+      action: 'preflight',
+    };
+    current.gates.ceremonyBroadcast = {
+      name: 'ceremonyBroadcast',
+      network: 'testnet11',
+      opensAt: 1_800_000_000,
+      closesAt: 1_800_000_900,
+      state: 'closed',
+      configuredState: 'enabled',
+      payloadHash: `0x${'66'.repeat(32)}`,
+      updatedAt: 1_800_000_000,
+    };
+    launch.workspace.and.resolveTo(current);
+    launch.proposeGate.and.resolveTo({
+      gate: { ...current.gates.ceremonyBroadcast, state: 'pending' },
+      decisionReceipt: {
+        title: 'Open final launch window',
+        network: 'testnet11',
+        financialEffect: 'No fee',
+        customerImpact: 'Allows only the approved genesis bundle',
+        reversibility: 'Closes automatically',
+        requiredApprovers: 'Owner plus one coadministrator',
+      },
+    });
+    launch.prepareAction.and.resolveTo({
+      actionId: 'gate-action',
+      payloadHash: `0x${'77'.repeat(32)}`,
+      expiresAt: 1_900_000_000,
+      typedData,
+      typedDataHash: `0x${'88'.repeat(32)}`,
+      decisionReceipt: {
+        title: 'Open final launch window',
+        network: 'testnet11',
+        financialEffect: 'No fee',
+        customerImpact: 'Allows only the approved genesis bundle',
+        reversibility: 'Closes automatically',
+        requiredApprovers: 'Owner plus one coadministrator',
+      },
+    });
 
-    await component.createDraft();
+    component.workspace.set(current);
+    await component.runPrimaryAction();
 
-    expect(genesis.createDraft).not.toHaveBeenCalled();
-    expect(component.error()).toContain('Invalid ceremony JSON');
+    expect(launch.broadcast).not.toHaveBeenCalled();
+    expect(component.pendingDecision()?.kind).toBe('action');
+    expect(component.decisionReceipt()?.customerImpact).toContain(
+      'only the approved genesis bundle',
+    );
   });
 });

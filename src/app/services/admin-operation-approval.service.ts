@@ -37,6 +37,10 @@ export interface AdminOperationApproval {
   authorityLauncherId: string;
   network: 'testnet11' | 'mainnet';
   nonce: string;
+  createdBy: string;
+  createdAt: number;
+  approvedAt?: number | null;
+  consumedAt?: number | null;
   requestBinding: AdminRequestBindingV1;
   signatures: Array<{ adminIndex: number; signerAddress: string; signedAt: number }>;
   typedData: Eip712TypedData;
@@ -83,6 +87,20 @@ export class AdminOperationApprovalService {
       this.http.get<AdminOperationApproval>(
         `${this.base}/admin/auth/operations/${encodeURIComponent(operationId)}`,
         { headers: this.authHeaders() },
+      ),
+    );
+  }
+
+  list(
+    statusFilter: 'active' | 'pending' | 'approved' | 'consumed' | 'all' = 'active',
+  ): Promise<{ operations: AdminOperationApproval[]; count: number }> {
+    return firstValueFrom(
+      this.http.get<{ operations: AdminOperationApproval[]; count: number }>(
+        `${this.base}/admin/auth/operations`,
+        {
+          headers: this.authHeaders(),
+          params: { status_filter: statusFilter },
+        },
       ),
     );
   }

@@ -75,8 +75,8 @@ export const routes: Routes = [
     // inject() inside the guard runs in a valid injection context.
     canActivate: [adminAuthGuard],
     loadComponent: () =>
-      import('./pages/admin/collections/collections.component').then(
-        (m) => m.CollectionsComponent,
+      import('./pages/admin/dashboard/admin-dashboard.component').then(
+        (m) => m.AdminDashboardComponent,
       ),
     title: 'Admin Desk · Solslot',
   },
@@ -100,11 +100,30 @@ export const routes: Routes = [
   },
   {
     path: 'admin/omnichain-activation',
+    canActivate: [adminAuthGuard],
     loadComponent: () =>
       import(
         './pages/admin/omnichain-ownership-activation/omnichain-ownership-activation.component'
       ).then((m) => m.OmnichainOwnershipActivationComponent),
     title: 'Base Sepolia Ownership · Solslot',
+  },
+  {
+    path: 'admin/sales',
+    canActivate: [adminAuthGuard],
+    loadComponent: () =>
+      import('./pages/admin/sales/admin-sales.component').then(
+        (m) => m.AdminSalesComponent,
+      ),
+    title: 'Sales & Refunds · Solslot',
+  },
+  {
+    path: 'admin/system-health',
+    canActivate: [adminAuthGuard],
+    loadComponent: () =>
+      import('./pages/admin/system-health/admin-system-health.component').then(
+        (m) => m.AdminSystemHealthComponent,
+      ),
+    title: 'System Health · Solslot',
   },
   {
     path: 'admin/mint',

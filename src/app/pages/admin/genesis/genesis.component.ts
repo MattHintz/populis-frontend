@@ -2,857 +2,888 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  OnDestroy,
   OnInit,
   computed,
   inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 
-import { environment } from '../../../../environments/environment';
 import {
-  AdminGenesisService,
-  GenesisCeremony,
-  GenesisInvitation,
-  GenesisPlanInput,
-  GenesisPreflight,
-  GenesisSourceShas,
-} from '../../../services/admin-genesis.service';
+  ActionApproval,
+  AdminLaunchService,
+  DecisionReceipt,
+  FundingPreparation,
+  FundingReceipt,
+  LaunchActionType,
+  LaunchGateName,
+  LaunchInvitation,
+  LaunchPublicStatus,
+  LaunchSummary,
+  LaunchWorkspace,
+  PreparedLaunchAction,
+  PreparedSignature,
+  RailOwnershipApproval,
+  RailOwnershipResult,
+  ReadinessFinding,
+  SettlementRehearsalResult,
+} from '../../../services/admin-launch.service';
 import { EvmWalletService } from '../../../services/evm-wallet.service';
 import { formatError } from '../../../utils/format-error';
 
-type GenesisAction =
-  | 'draft'
-  | 'load'
-  | 'invite'
-  | 'enroll'
-  | 'roster'
-  | 'plan'
-  | 'plan-sign'
-  | 'preflight'
-  | 'broadcast'
-  | 'confirm'
-  | 'artifact'
-  | 'artifact-sign'
-  | 'finalize'
-  | 'abandon'
-  | 'wallet'
-  | null;
+type WalletKind = 'injected' | 'walletconnect';
+type PendingDecision =
+  | {
+      kind: 'action';
+      actionType: LaunchActionType;
+      prepared: PreparedLaunchAction;
+    }
+  | {
+      kind: 'plan';
+      prepared: PreparedSignature;
+    }
+  | {
+      kind: 'broadcast';
+      receipt: DecisionReceipt;
+    }
+  | {
+      kind: 'artifact';
+      prepared: PreparedSignature;
+    }
+  | {
+      kind: 'rail-sign';
+      rail: RailOwnershipResult;
+      approval: RailOwnershipApproval;
+    }
+  | {
+      kind: 'rail-broadcast';
+      rail: RailOwnershipResult;
+    }
+  | {
+      kind: 'rehearsal-payment';
+      rehearsal: SettlementRehearsalResult;
+    };
+
+interface LaunchStage {
+  label: string;
+  description: string;
+}
 
 @Component({
   selector: 'solslot-admin-genesis',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule],
+  templateUrl: './genesis.component.html',
+  styleUrl: './genesis.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <main class="container-p max-w-7xl py-8 md:py-12">
-      <header class="border-b border-white/10 pb-5">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div class="max-w-3xl">
-            <div class="mono text-[0.68rem] uppercase tracking-[0.18em] text-brand">
-              Solslot V2 · testnet11
-            </div>
-            <h1 class="font-display text-3xl md:text-4xl mt-2">Genesis ceremony console</h1>
-            <p class="text-sm text-text-muted mt-2">
-              Eight singleton surfaces, 32 bridge parents, three administrators, and one
-              deterministic broadcast.
-            </p>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="gate" [class.gate--ready]="writesEnabled">
-              {{ writesEnabled ? 'ceremony writes enabled' : 'read-only launch lock' }}
-            </span>
-            <a routerLink="/admin" class="btn btn--ghost">Admin desk</a>
-          </div>
-        </div>
-      </header>
-
-      <section class="grid gap-px bg-white/10 border border-white/10 md:grid-cols-5 mt-5">
-        <div class="status-cell">
-          <span>State</span><strong>{{ ceremony()?.state || 'not loaded' }}</strong>
-        </div>
-        <div class="status-cell">
-          <span>Roster</span><strong>{{ enrolledAdmins() }} / 3</strong>
-        </div>
-        <div class="status-cell">
-          <span>Plan signatures</span><strong>{{ planSignatures() }} / 2</strong>
-        </div>
-        <div class="status-cell">
-          <span>Artifact signatures</span><strong>{{ artifactSignatures() }} / 2</strong>
-        </div>
-        <div class="status-cell">
-          <span>Wallet</span><strong>{{ shortWallet() }}</strong>
-        </div>
-      </section>
-
-      @if (error()) {
-        <section class="notice notice--error mt-4" role="alert">
-          <strong>Action rejected</strong><span>{{ error() }}</span>
-        </section>
-      }
-      @if (message()) {
-        <section class="notice mt-4" role="status">
-          <strong>Current result</strong><span>{{ message() }}</span>
-        </section>
-      }
-
-      <section class="grid gap-6 lg:grid-cols-[0.72fr_1.28fr] mt-6">
-        <div class="space-y-5">
-          <section class="panel">
-            <div class="section-label">Operator access</div>
-            <label class="field mt-3">
-              <span>SOLSLOT_ADMIN_TOKEN</span>
-              <input
-                type="password"
-                class="input mono"
-                autocomplete="off"
-                [(ngModel)]="tokenInput"
-              />
-            </label>
-            <label class="field mt-3">
-              <span>Ceremony ID</span>
-              <input class="input mono" [(ngModel)]="ceremonyIdInput" placeholder="0x…" />
-            </label>
-            <button
-              class="btn btn--ghost w-full justify-center mt-3"
-              [disabled]="busy()"
-              (click)="loadCeremony()"
-            >
-              {{ pendingAction() === 'load' ? 'Loading…' : 'Load ceremony' }}
-            </button>
-          </section>
-
-          <section class="panel">
-            <div class="section-label">Administrator wallet</div>
-            <div class="grid grid-cols-2 gap-2 mt-3">
-              <button
-                class="btn btn--ghost justify-center"
-                [disabled]="busy()"
-                (click)="connectInjected()"
-              >
-                Browser wallet
-              </button>
-              <button
-                class="btn btn--ghost justify-center"
-                [disabled]="busy()"
-                (click)="connectWalletConnect()"
-              >
-                WalletConnect
-              </button>
-            </div>
-            <label class="field mt-3">
-              <span>Invitation fragment token</span>
-              <input class="input mono" [(ngModel)]="invitationTokenInput" />
-            </label>
-            <button
-              class="btn btn--primary w-full justify-center mt-3"
-              [disabled]="
-                busy() || !writesEnabled || !invitationTokenInput().trim() || !wallet.address()
-              "
-              (click)="acceptInvitation()"
-            >
-              {{ pendingAction() === 'enroll' ? 'Signing enrollment…' : 'Enroll this admin slot' }}
-            </button>
-          </section>
-
-          <section class="panel">
-            <div class="section-label">Safety gates</div>
-            <div class="gate-list mt-3">
-              <div>
-                <span>Frozen source commits</span
-                ><b>{{ ceremony()?.source_shas ? 'yes' : 'no' }}</b>
-              </div>
-              <div>
-                <span>2-of-3 plan approval</span><b>{{ planSignatures() >= 2 ? 'yes' : 'no' }}</b>
-              </div>
-              <div>
-                <span>Internal testnet review</span
-                ><b>{{ preflight()?.ready ? 'verified' : 'pending' }}</b>
-              </div>
-              <div>
-                <span>Deterministic spend count</span
-                ><b>{{ preflight()?.spendCount || 'pending' }}</b>
-              </div>
-              <div>
-                <span>Post-chain artifact quorum</span
-                ><b>{{ artifactSignatures() >= 2 ? 'yes' : 'no' }}</b>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div class="space-y-5">
-          <section class="panel">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div class="section-label">1 · Frozen release</div>
-                <h2 class="font-display text-xl mt-1">Create a clean ceremony draft</h2>
-              </div>
-              <button
-                class="btn btn--primary"
-                [disabled]="busy() || !writesEnabled"
-                (click)="createDraft()"
-              >
-                {{ pendingAction() === 'draft' ? 'Creating…' : 'Create draft' }}
-              </button>
-            </div>
-            <textarea class="code-input mt-4" rows="8" [(ngModel)]="sourceShasJson"></textarea>
-          </section>
-
-          <section class="panel">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div class="section-label">2 · Admin roster</div>
-                <h2 class="font-display text-xl mt-1">Three independent wallet slots</h2>
-              </div>
-              <button
-                class="btn btn--primary"
-                [disabled]="busy() || !writesEnabled || enrolledAdmins() !== 3"
-                (click)="freezeRoster()"
-              >
-                Freeze roster
-              </button>
-            </div>
-            <div class="grid gap-2 md:grid-cols-3 mt-4">
-              @for (slot of [1, 2, 3]; track slot) {
-                <div class="slot">
-                  <div class="flex items-center justify-between gap-2">
-                    <strong>Admin {{ slot }}</strong>
-                    <span>{{ slotStatus(slot) }}</span>
-                  </div>
-                  <button
-                    class="btn btn--ghost w-full justify-center mt-3"
-                    [disabled]="busy() || !writesEnabled || slotEnrolled(slot)"
-                    (click)="issueInvitation(slot)"
-                  >
-                    Issue invitation
-                  </button>
-                  @if (invitationFragments()[slot]; as fragment) {
-                    <input class="input mono mt-2" readonly [value]="fragment" />
-                  }
-                </div>
-              }
-            </div>
-          </section>
-
-          <section class="panel">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div class="section-label">3 · Deterministic plan</div>
-                <h2 class="font-display text-xl mt-1">
-                  Coordinates, funding, validators, and trust anchors
-                </h2>
-              </div>
-              <button
-                class="btn btn--primary"
-                [disabled]="busy() || !writesEnabled || ceremony()?.state !== 'roster_frozen'"
-                (click)="createPlan()"
-              >
-                {{ pendingAction() === 'plan' ? 'Building…' : 'Build plan' }}
-              </button>
-            </div>
-            <textarea class="code-input mt-4" rows="18" [(ngModel)]="planJson"></textarea>
-            <div class="flex flex-wrap items-end gap-3 mt-3">
-              <label class="field w-28">
-                <span>Admin slot</span>
-                <select class="input" [(ngModel)]="signerSlotInput">
-                  <option [ngValue]="1">1</option>
-                  <option [ngValue]="2">2</option>
-                  <option [ngValue]="3">3</option>
-                </select>
-              </label>
-              <button
-                class="btn btn--ghost"
-                [disabled]="busy() || !writesEnabled || !ceremony()?.plan_hash || !wallet.address()"
-                (click)="signPlan()"
-              >
-                {{ pendingAction() === 'plan-sign' ? 'Signing…' : 'Sign plan hash' }}
-              </button>
-            </div>
-          </section>
-
-          <section class="panel">
-            <div class="section-label">4 · Pre-broadcast gate</div>
-            <div class="action-row mt-3">
-              <button
-                class="btn btn--primary"
-                [disabled]="busy() || !writesEnabled || ceremony()?.state !== 'plan_approved'"
-                (click)="runPreflight()"
-              >
-                {{ pendingAction() === 'preflight' ? 'Verifying…' : 'Run preflight' }}
-              </button>
-              <label class="check">
-                <input type="checkbox" [(ngModel)]="broadcastArmed" />
-                <span>Plan hash and testnet evidence reviewed</span>
-              </label>
-              <button
-                class="btn btn--danger"
-                [disabled]="busy() || !writesEnabled || !preflight()?.ready || !broadcastArmed()"
-                (click)="broadcast()"
-              >
-                {{ pendingAction() === 'broadcast' ? 'Broadcasting…' : 'Broadcast once' }}
-              </button>
-            </div>
-            @if (preflight(); as result) {
-              <dl class="result-grid mt-4">
-                <div>
-                  <dt>Plan hash</dt>
-                  <dd>{{ result.planHash }}</dd>
-                </div>
-                <div>
-                  <dt>Bundle ID</dt>
-                  <dd>{{ result.spendBundleId }}</dd>
-                </div>
-                <div>
-                  <dt>Review class</dt>
-                  <dd>{{ result.reviewClass }}</dd>
-                </div>
-                <div>
-                  <dt>Evidence hash</dt>
-                  <dd>{{ result.auditApprovalHash }}</dd>
-                </div>
-              </dl>
-            }
-          </section>
-
-          <section class="panel">
-            <div class="section-label">5 · Confirmation and signed artifact</div>
-            <div class="action-row mt-3">
-              <button
-                class="btn btn--ghost"
-                [disabled]="busy() || !writesEnabled || ceremony()?.state !== 'broadcast'"
-                (click)="confirm()"
-              >
-                Check three confirmations
-              </button>
-              <button
-                class="btn btn--ghost"
-                [disabled]="busy() || !writesEnabled || ceremony()?.state !== 'confirmed'"
-                (click)="createArtifact()"
-              >
-                Build artifact
-              </button>
-              <button
-                class="btn btn--ghost"
-                [disabled]="
-                  busy() || !writesEnabled || !ceremony()?.artifact_hash || !wallet.address()
-                "
-                (click)="signArtifact()"
-              >
-                Sign artifact hash
-              </button>
-              <button
-                class="btn btn--primary"
-                [disabled]="busy() || !writesEnabled || ceremony()?.state !== 'artifact_signed'"
-                (click)="finalize()"
-              >
-                Write lock last
-              </button>
-            </div>
-          </section>
-
-          <section class="panel border-red-500/30">
-            <div class="section-label text-red-300">Abandonment</div>
-            <div class="flex flex-col md:flex-row gap-3 mt-3">
-              <input
-                class="input flex-1"
-                [(ngModel)]="abandonReasonInput"
-                placeholder="Recorded reason, minimum 8 characters"
-              />
-              <button
-                class="btn btn--danger"
-                [disabled]="busy() || !writesEnabled || abandonReasonInput().trim().length < 8"
-                (click)="abandon()"
-              >
-                Abandon ceremony
-              </button>
-            </div>
-          </section>
-        </div>
-      </section>
-    </main>
-  `,
-  styles: `
-    .panel {
-      border: 1px solid rgb(255 255 255 / 0.1);
-      background: rgb(255 255 255 / 0.025);
-      padding: 1rem;
-      border-radius: 4px;
-    }
-    .status-cell {
-      background: rgb(5 18 21);
-      padding: 0.8rem;
-      min-width: 0;
-    }
-    .status-cell span,
-    .field span,
-    .section-label {
-      display: block;
-      font: 600 0.66rem/1.25 monospace;
-      text-transform: uppercase;
-      letter-spacing: 0;
-      color: var(--color-text-muted);
-    }
-    .status-cell strong {
-      display: block;
-      margin-top: 0.3rem;
-      overflow-wrap: anywhere;
-    }
-    .field .input {
-      width: 100%;
-      margin-top: 0.35rem;
-    }
-    .code-input {
-      width: 100%;
-      resize: vertical;
-      border: 1px solid rgb(255 255 255 / 0.12);
-      background: rgb(0 8 10 / 0.8);
-      padding: 0.8rem;
-      font: 0.72rem/1.55 monospace;
-      color: inherit;
-      border-radius: 3px;
-    }
-    .notice {
-      display: grid;
-      grid-template-columns: 9rem 1fr;
-      gap: 1rem;
-      border: 1px solid rgb(77 255 178 / 0.3);
-      background: rgb(77 255 178 / 0.07);
-      padding: 0.8rem;
-      font-size: 0.82rem;
-    }
-    .notice--error {
-      border-color: rgb(248 113 113 / 0.45);
-      background: rgb(248 113 113 / 0.08);
-    }
-    .gate {
-      border: 1px solid rgb(248 113 113 / 0.45);
-      padding: 0.45rem 0.6rem;
-      font: 600 0.65rem/1 monospace;
-      text-transform: uppercase;
-    }
-    .gate--ready {
-      border-color: rgb(77 255 178 / 0.45);
-      color: rgb(134 239 172);
-    }
-    .slot {
-      border: 1px solid rgb(255 255 255 / 0.1);
-      padding: 0.75rem;
-      min-width: 0;
-    }
-    .slot span {
-      font: 0.65rem monospace;
-      color: var(--color-text-muted);
-    }
-    .gate-list {
-      display: grid;
-      gap: 0.65rem;
-      font-size: 0.78rem;
-    }
-    .gate-list div {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      border-bottom: 1px solid rgb(255 255 255 / 0.08);
-      padding-bottom: 0.55rem;
-    }
-    .action-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.65rem;
-    }
-    .check {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      font-size: 0.75rem;
-      color: var(--color-text-muted);
-    }
-    .result-grid {
-      display: grid;
-      gap: 0.5rem;
-    }
-    .result-grid div {
-      display: grid;
-      grid-template-columns: 8rem minmax(0, 1fr);
-      gap: 0.75rem;
-      font-size: 0.72rem;
-    }
-    .result-grid dt {
-      color: var(--color-text-muted);
-    }
-    .result-grid dd {
-      font-family: monospace;
-      overflow-wrap: anywhere;
-    }
-    @media (max-width: 640px) {
-      .notice,
-      .result-grid div {
-        grid-template-columns: 1fr;
-        gap: 0.25rem;
-      }
-    }
-  `,
 })
-export class GenesisComponent implements OnInit {
-  private readonly genesis = inject(AdminGenesisService);
+export class GenesisComponent implements OnInit, OnDestroy {
+  private readonly launch = inject(AdminLaunchService);
+  private readonly router = inject(Router);
   readonly wallet = inject(EvmWalletService);
 
-  readonly writesEnabled = environment.protocolWritesEnabled;
-  readonly tokenInput = signal('');
-  readonly ceremonyIdInput = signal('');
-  readonly invitationTokenInput = signal('');
-  readonly signerSlotInput = signal(1);
-  readonly abandonReasonInput = signal('');
-  readonly sourceShasJson = signal(defaultSourceShasJson());
-  readonly planJson = signal(defaultPlanJson());
-  readonly ceremony = signal<GenesisCeremony | null>(null);
-  readonly invitationFragments = signal<Record<number, string>>({});
-  readonly preflight = signal<GenesisPreflight | null>(null);
-  readonly broadcastArmed = signal(false);
-  readonly pendingAction = signal<GenesisAction>(null);
+  readonly publicStatus = signal<LaunchPublicStatus | null>(null);
+  readonly workspace = signal<LaunchWorkspace | null>(null);
+  readonly railOwnership = signal<RailOwnershipResult | null>(null);
+  readonly settlementRehearsal = signal<SettlementRehearsalResult | null>(null);
+  readonly fundingPreparation = signal<FundingPreparation | null>(null);
+  readonly pendingDecision = signal<PendingDecision | null>(null);
+  readonly invitationLinks = signal<Partial<Record<2 | 3, string>>>({});
+  readonly archive = signal<LaunchSummary[]>([]);
+  readonly pending = signal<string | null>(null);
   readonly error = signal<string | null>(null);
   readonly message = signal<string | null>(null);
 
-  readonly busy = computed(() => this.pendingAction() !== null);
-  readonly enrolledAdmins = computed(
-    () => this.ceremony()?.invitations?.filter((slot) => !!slot.compressed_pubkey).length || 0,
+  readonly ownerToken = signal<string | null>(null);
+  readonly enrollmentToken = signal<string | null>(null);
+  readonly secureLinkMode = computed(() =>
+    this.ownerToken() ? 'owner' : this.enrollmentToken() ? 'invite' : null,
   );
-  readonly planSignatures = computed(() => this.ceremony()?.plan_signatures?.length || 0);
-  readonly artifactSignatures = computed(() => this.ceremony()?.artifact_signatures?.length || 0);
-  readonly shortWallet = computed(() => {
-    const address = this.wallet.address();
-    return address ? `${address.slice(0, 8)}…${address.slice(-6)}` : 'not connected';
+
+  ownerName = 'Owner';
+  ownerEmail = '';
+  admin2Name = '';
+  admin2Email = '';
+  admin3Name = '';
+  admin3Email = '';
+  abandonmentReason = '';
+  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago';
+
+  readonly stages: LaunchStage[] = [
+    { label: 'Release Check', description: 'Confirm the exact reviewed RC21 release.' },
+    { label: 'Administrator Enrollment', description: 'Enroll the owner and two coadmins.' },
+    { label: 'Rail Ownership', description: 'Complete the Safe and timelock handoff.' },
+    { label: 'Settlement Rehearsal', description: 'Prove payment, delivery, and refund paths.' },
+    { label: 'Ceremony Funding', description: 'Create the nine fixed Testnet11 inputs.' },
+    { label: 'Plan Review', description: 'Build the plan from signed release evidence.' },
+    { label: 'Administrator Approval', description: 'Owner plus one approve the exact plan.' },
+    { label: 'Final Launch', description: 'Owner broadcasts during a short approved window.' },
+    { label: 'Confirmation', description: 'Confirm the chain result and sign the artifact.' },
+    { label: 'Signed Archive', description: 'Lock and preserve the completed launch.' },
+  ];
+  readonly operationGateNames = ['minting', 'presale', 'purchases'] as const;
+
+  readonly enrolledCount = computed(
+    () => this.workspace()?.launch.administrators.filter((admin) => admin.enrolled).length ?? 0,
+  );
+  readonly currentStageIndex = computed(() => this.resolveStageIndex());
+  readonly connectedWalletLabel = computed(() => {
+    const value = this.wallet.address();
+    return value ? `${value.slice(0, 8)}...${value.slice(-6)}` : 'Not connected';
   });
+  readonly fundingReceipt = computed<FundingReceipt | null>(() => {
+    const prepared = this.fundingPreparation()?.receipt;
+    if (prepared) return prepared;
+    const evidence = this.finding('funding')?.evidence;
+    return evidence && typeof evidence === 'object' ? (evidence as FundingReceipt) : null;
+  });
+  readonly ownerSession = computed(() => this.workspace()?.session.role === 'owner');
+  readonly coadminSession = computed(() => this.workspace()?.session.role === 'coadmin');
+  readonly primaryActionLabel = computed(() => this.nextActionLabel());
 
-  ngOnInit(): void {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-    const invitation = params.get('genesis-admin');
-    if (invitation) this.invitationTokenInput.set(invitation);
-  }
+  private progressTimer: ReturnType<typeof setInterval> | null = null;
+  private rehearsalTimer: ReturnType<typeof setInterval> | null = null;
 
-  async connectInjected(): Promise<void> {
-    await this.perform(
-      'wallet',
-      () => this.wallet.connectInjected(),
-      () => {
-        this.message.set('Browser wallet connected for ceremony signatures.');
-      },
-    );
-  }
-
-  async connectWalletConnect(): Promise<void> {
-    await this.perform(
-      'wallet',
-      () => this.wallet.connectWalletConnect({ resetSession: true }),
-      () => {
-        this.message.set('WalletConnect session established for ceremony signatures.');
-      },
-    );
-  }
-
-  async createDraft(): Promise<void> {
-    await this.perform(
-      'draft',
-      () =>
-        this.genesis.createDraft(
-          this.tokenInput(),
-          parseJson<GenesisSourceShas>(this.sourceShasJson()),
-        ),
-      (result) => {
-        this.setCeremony(result);
-        this.message.set('Fresh ceremony draft created from five frozen commits.');
-      },
-    );
-  }
-
-  async loadCeremony(): Promise<void> {
-    await this.perform(
-      'load',
-      () => this.genesis.getCeremony(this.tokenInput(), this.requiredCeremonyId()),
-      (result) => {
-        this.setCeremony(result);
-        this.message.set(`Ceremony state recovered: ${result.state}.`);
-      },
-    );
-  }
-
-  async issueInvitation(slot: number): Promise<void> {
-    await this.perform(
-      'invite',
-      () => this.genesis.issueInvitation(this.tokenInput(), this.requiredCeremonyId(), slot),
-      (result: GenesisInvitation) => {
-        this.invitationFragments.update((current) => ({
-          ...current,
-          [slot]: result.invitationFragment,
-        }));
-        this.message.set(`Administrator ${slot} invitation issued; it expires in 48 hours.`);
-      },
-    );
-  }
-
-  async acceptInvitation(): Promise<void> {
-    const address = this.wallet.address();
-    if (!address) {
-      this.error.set('Connect the administrator wallet before accepting an invitation.');
-      return;
-    }
-    const invitationToken = this.invitationTokenInput().trim();
-    await this.perform(
-      'enroll',
-      async () => {
-        const prepared = await this.genesis.prepareInvitation(invitationToken, address);
-        const signature = await this.wallet.signTypedData(prepared.typedData);
-        const accepted = await this.genesis.acceptInvitation(invitationToken, address, signature);
-        this.ceremonyIdInput.set(accepted.ceremonyId);
-        return accepted;
-      },
-      (result) => this.message.set(`Administrator slot ${result.slot} enrolled.`),
-    );
-  }
-
-  async freezeRoster(): Promise<void> {
-    await this.operatorMutation('roster', () =>
-      this.genesis.freezeRoster(this.tokenInput(), this.requiredCeremonyId()),
-    );
-  }
-
-  async createPlan(): Promise<void> {
-    await this.perform(
-      'plan',
-      () =>
-        this.genesis.createPlan(
-          this.tokenInput(),
-          this.requiredCeremonyId(),
-          parseJson<GenesisPlanInput>(this.planJson()),
-        ),
-      (result) => {
-        this.setCeremony(result.ceremony);
-        this.message.set(
-          'Deterministic plan created. Two enrolled administrators must sign its hash.',
-        );
-      },
-    );
-  }
-
-  async signPlan(): Promise<void> {
-    await this.perform(
-      'plan-sign',
-      async () => {
-        const ceremonyId = this.requiredCeremonyId();
-        const prepared = await this.genesis.preparePlanSignature(
-          ceremonyId,
-          this.signerSlotInput(),
-        );
-        const signature = await this.wallet.signTypedData(prepared.typedData);
-        return this.genesis.signPlan(ceremonyId, prepared.slot, signature);
-      },
-      (result) => {
-        this.setCeremony(result);
-        this.message.set(`Plan signature ${this.planSignatures()} of 2 recorded.`);
-      },
-    );
-  }
-
-  async runPreflight(): Promise<void> {
-    await this.perform(
-      'preflight',
-      () => this.genesis.preflight(this.tokenInput(), this.requiredCeremonyId()),
-      (result) => {
-        this.preflight.set(result);
-        this.broadcastArmed.set(false);
-        this.message.set(
-          'Pre-broadcast gate passed against live funding, Sepolia, and validator evidence.',
-        );
-      },
-    );
-  }
-
-  async broadcast(): Promise<void> {
-    if (!this.preflight()?.ready || !this.broadcastArmed()) {
-      this.error.set('Run and review preflight before broadcast.');
-      return;
-    }
-    if (!window.confirm('Broadcast this deterministic ceremony exactly once?')) return;
-    await this.operatorMutation('broadcast', () =>
-      this.genesis.broadcast(this.tokenInput(), this.requiredCeremonyId()),
-    );
-  }
-
-  async confirm(): Promise<void> {
-    await this.operatorMutation('confirm', () =>
-      this.genesis.confirm(this.tokenInput(), this.requiredCeremonyId()),
-    );
-  }
-
-  async createArtifact(): Promise<void> {
-    await this.perform(
-      'artifact',
-      () => this.genesis.createArtifact(this.tokenInput(), this.requiredCeremonyId()),
-      (result) => {
-        this.setCeremony(result.ceremony);
-        this.message.set('Canonical artifact built. Two administrators must sign its hash.');
-      },
-    );
-  }
-
-  async signArtifact(): Promise<void> {
-    await this.perform(
-      'artifact-sign',
-      async () => {
-        const ceremonyId = this.requiredCeremonyId();
-        const prepared = await this.genesis.prepareArtifactSignature(
-          ceremonyId,
-          this.signerSlotInput(),
-        );
-        const signature = await this.wallet.signTypedData(prepared.typedData);
-        return this.genesis.signArtifact(ceremonyId, prepared.slot, signature);
-      },
-      (result) => {
-        this.setCeremony(result);
-        this.message.set(`Artifact signature ${this.artifactSignatures()} of 2 recorded.`);
-      },
-    );
-  }
-
-  async finalize(): Promise<void> {
-    await this.perform(
-      'finalize',
-      () => this.genesis.finalize(this.tokenInput(), this.requiredCeremonyId()),
-      (result) => {
-        this.setCeremony(result.ceremony);
-        this.message.set(`Ceremony locked. Artifact ${result.artifactHash}.`);
-      },
-    );
-  }
-
-  async abandon(): Promise<void> {
-    if (!window.confirm('Permanently abandon this ceremony and all of its coordinates?')) return;
-    await this.operatorMutation('abandon', () =>
-      this.genesis.abandon(
-        this.tokenInput(),
-        this.requiredCeremonyId(),
-        this.abandonReasonInput().trim(),
-      ),
-    );
-  }
-
-  slotEnrolled(slot: number): boolean {
-    return !!this.ceremony()?.invitations?.find((entry) => entry.slot === slot)?.compressed_pubkey;
-  }
-
-  slotStatus(slot: number): string {
-    return this.slotEnrolled(slot)
-      ? 'enrolled'
-      : this.invitationFragments()[slot]
-        ? 'invited'
-        : 'open';
-  }
-
-  private async operatorMutation(
-    action: GenesisAction,
-    operation: () => Promise<GenesisCeremony>,
-  ): Promise<void> {
-    await this.perform(action, operation, (result) => {
-      this.setCeremony(result);
-      this.message.set(`Ceremony advanced to ${result.state}.`);
+  async ngOnInit(): Promise<void> {
+    this.consumeFragment();
+    await this.perform('load', async () => {
+      this.publicStatus.set(await this.launch.publicStatus());
+      try {
+        await this.reloadWorkspace(true);
+      } catch {
+        this.workspace.set(null);
+      }
     });
   }
 
-  private async perform<T>(
-    action: GenesisAction,
-    operation: () => Promise<T>,
-    success: (result: T) => void,
-  ): Promise<void> {
-    if (this.busy()) return;
-    this.pendingAction.set(action);
-    this.error.set(null);
-    try {
-      success(await operation());
-    } catch (error) {
-      this.error.set(formatError(error));
-    } finally {
-      this.pendingAction.set(null);
+  ngOnDestroy(): void {
+    this.stopProgressPolling();
+    this.stopRehearsalPolling();
+  }
+
+  async claimOwner(kind: WalletKind): Promise<void> {
+    const token = this.ownerToken();
+    if (!token) return;
+    if (!this.ownerName.trim()) {
+      this.error.set('Enter the owner name before continuing.');
+      return;
+    }
+    await this.perform('claim', async () => {
+      const claimed = await this.launch.claimOwner({
+        token,
+        displayName: this.ownerName.trim(),
+        email: this.ownerEmail.trim() || undefined,
+        timezone: this.timezone,
+      });
+      this.ownerToken.set(null);
+      this.enrollmentToken.set(claimed.ownerEnrollmentToken);
+      await this.connectAndEnroll(kind);
+    });
+  }
+
+  async acceptInvite(kind: WalletKind): Promise<void> {
+    if (!this.enrollmentToken()) return;
+    await this.perform('enroll', () => this.connectAndEnroll(kind));
+  }
+
+  async signIn(kind: WalletKind): Promise<void> {
+    await this.perform('signin', async () => {
+      const wallet = await this.connect(kind);
+      const challenge = await this.launch.resumeChallenge(wallet);
+      const signature = await this.wallet.signLaunchAction(challenge.typedData);
+      await this.launch.resumeLogin(wallet, challenge.nonce, signature);
+      await this.reloadWorkspace();
+      this.message.set('Administrator wallet verified. Your launch tasks are ready.');
+    });
+  }
+
+  async logout(): Promise<void> {
+    await this.perform('logout', async () => {
+      await this.launch.logout();
+      await this.wallet.disconnect();
+      this.workspace.set(null);
+      this.stopProgressPolling();
+      this.stopRehearsalPolling();
+      this.message.set('Signed out. The launch remains safely saved.');
+    });
+  }
+
+  async issueInvitation(slot: 2 | 3): Promise<void> {
+    const displayName = (slot === 2 ? this.admin2Name : this.admin3Name).trim();
+    const email = (slot === 2 ? this.admin2Email : this.admin3Email).trim();
+    if (!displayName) {
+      this.error.set(`Enter a name for Admin ${slot}.`);
+      return;
+    }
+    await this.perform(`invite-${slot}`, async () => {
+      const invitation = await this.launch.issueInvitation(slot, {
+        displayName,
+        email: email || undefined,
+        timezone: this.timezone,
+        remindersEnabled: true,
+      });
+      const link = this.invitationUrl(invitation);
+      this.invitationLinks.update((current) => ({ ...current, [slot]: link }));
+      await this.copyText(link);
+      await this.reloadWorkspace();
+      this.message.set(`Admin ${slot}'s private invitation link was copied.`);
+    });
+  }
+
+  async copyInvitation(slot: 2 | 3): Promise<void> {
+    const link = this.invitationLinks()[slot];
+    if (!link) return;
+    await this.copyText(link);
+    this.message.set(`Admin ${slot}'s invitation link was copied.`);
+  }
+
+  async runPrimaryAction(): Promise<void> {
+    const action = this.workspace()?.nextTask.action;
+    if (!action || this.pending()) return;
+    switch (action) {
+      case 'enrollment':
+        this.focusElement('administrator-team');
+        return;
+      case 'railOwnership':
+        await this.advanceRailOwnership();
+        return;
+      case 'settlementRehearsal':
+        await this.advanceSettlementRehearsal();
+        return;
+      case 'funding':
+        await this.advanceFunding();
+        return;
+      case 'freezeRoster':
+        await this.simpleMutation('freeze-roster', () => this.launch.freezeRoster());
+        return;
+      case 'buildPlan':
+        await this.simpleMutation('build-plan', () => this.launch.buildPlan());
+        return;
+      case 'signPlan':
+        await this.reviewPlanSignature();
+        return;
+      case 'preflight':
+        await this.advanceFinalLaunch();
+        return;
+      case 'confirm':
+      case 'createArtifact':
+        await this.progressLaunch();
+        return;
+      case 'signArtifact':
+        await this.reviewArtifactSignature();
+        return;
+      case 'finalize':
+        await this.progressLaunch();
+        return;
+      case 'openOperations':
+        await this.router.navigate(['/admin']);
+        return;
+      default:
+        await this.reloadWorkspace();
     }
   }
 
-  private setCeremony(result: GenesisCeremony): void {
-    this.ceremony.set(result);
-    this.ceremonyIdInput.set(result.ceremony_id);
+  async prepareFunding(): Promise<void> {
+    await this.perform('prepare-funding', async () => {
+      this.fundingPreparation.set(await this.launch.prepareFunding());
+      await this.reloadWorkspace();
+      this.message.set(
+        'The fixed nine-output funding transaction is ready for owner-plus-one review.',
+      );
+    });
   }
 
-  private requiredCeremonyId(): string {
-    const value = this.ceremony()?.ceremony_id || this.ceremonyIdInput().trim();
-    if (!value) throw new Error('A ceremony ID is required.');
-    return value;
+  async reviewFundingApproval(): Promise<void> {
+    await this.reviewAction('funding');
   }
-}
 
-function parseJson<T>(value: string): T {
-  try {
-    return JSON.parse(value) as T;
-  } catch (error) {
-    throw new Error(`Invalid ceremony JSON: ${formatError(error)}`);
+  async executeFunding(): Promise<void> {
+    await this.simpleMutation('execute-funding', () => this.launch.executeFunding());
   }
-}
 
-function defaultSourceShasJson(): string {
-  return JSON.stringify(
-    {
-      protocol: '',
-      evm: '',
-      omnichain: '',
-      api: '',
-      legacyBackend: '',
-      keyOfSolomon: '',
-      samuel: '',
-      customerWeb: '',
-      adminPortal: '',
-    },
-    null,
-    2,
-  );
-}
+  async confirmFunding(): Promise<void> {
+    await this.simpleMutation('confirm-funding', () => this.launch.confirmFunding());
+  }
 
-function defaultPlanJson(): string {
-  return JSON.stringify(
-    {
-      evmAddresses: { forwarder: '', verifierAdapter: '', attestationEmitter: '' },
-      fundingCoinIds: {
-        sgt: '',
-        pool: '',
-        did: '',
-        governance: '',
-        navRegistry: '',
-        protocolConfig: '',
-        adminAuthority: '',
-        vaultVersionRegistry: '',
-        bridgeBatch: '',
-      },
-      faucetPuzzleHash: '',
-      governanceBlsPubkey: '',
-      validatorPubkeys: ['', '', ''],
-      trustedTreasuryReservePuzzleHash: '',
-      trustedProtocolTreasuryPuzzleHash: '',
-      trustedGovernanceRewardsPuzzleHash: '',
-      trustedGovernanceRewardsRoot: '',
-      retiredCoordinates: [''],
-      protocolParameters: {
-        quorumBps: 5000,
-        votingWindowSeconds: 300,
-        sgtTotalSupply: 1000000,
-        minProposalStake: 10000,
-        fpScale: 1000,
-        minNavRegistryVersion: 1,
-        initialPoolStatus: 1,
-        initialTotalPoolTokenSupply: 0,
-        initialTreasuryReserveTokens: 0,
-      },
-    },
-    null,
-    2,
-  );
+  async proposeLaunchWindow(): Promise<void> {
+    await this.perform('prepare-window', async () => {
+      const existing = this.workspace()?.gates.ceremonyBroadcast;
+      if (!existing || existing.state === 'closed' || existing.state === 'cancelled') {
+        await this.launch.proposeGate('ceremonyBroadcast', 0, 900);
+      }
+      await this.reloadWorkspace();
+      const prepared = await this.launch.prepareAction('gate:ceremonyBroadcast');
+      this.pendingDecision.set({
+        kind: 'action',
+        actionType: 'gate:ceremonyBroadcast',
+        prepared,
+      });
+    });
+  }
+
+  async activateLaunchWindow(): Promise<void> {
+    await this.simpleMutation('activate-window', () =>
+      this.launch.activateGate('ceremonyBroadcast'),
+    );
+  }
+
+  async reviewOperationWindow(name: Exclude<LaunchGateName, 'ceremonyBroadcast'>): Promise<void> {
+    await this.perform(`prepare-${name}-window`, async () => {
+      const existing = this.workspace()?.gates[name];
+      if (!existing || existing.state === 'closed' || existing.state === 'cancelled') {
+        await this.launch.proposeGate(name, 0, 1800);
+        await this.reloadWorkspace();
+      }
+      const actionType: LaunchActionType = `gate:${name}`;
+      const prepared = await this.launch.prepareAction(actionType);
+      this.pendingDecision.set({ kind: 'action', actionType, prepared });
+    });
+  }
+
+  async activateOperationWindow(
+    name: Exclude<LaunchGateName, 'ceremonyBroadcast'>,
+  ): Promise<void> {
+    await this.simpleMutation(`activate-${name}-window`, () => this.launch.activateGate(name));
+  }
+
+  async openOperations(): Promise<void> {
+    await this.router.navigate(['/admin']);
+  }
+
+  gateAction(name: Exclude<LaunchGateName, 'ceremonyBroadcast'>): LaunchActionType {
+    return `gate:${name}`;
+  }
+
+  async reviewAbandonment(): Promise<void> {
+    if (this.ownerSession() && !this.approval('abandon')) {
+      const reason = this.abandonmentReason.trim();
+      if (reason.length < 12) {
+        this.error.set('Explain why the launch must be abandoned before requesting approval.');
+        return;
+      }
+      await this.perform('prepare-abandonment', async () => {
+        const prepared = await this.launch.prepareAbandonment(reason);
+        this.pendingDecision.set({ kind: 'action', actionType: 'abandon', prepared });
+        await this.reloadWorkspace();
+      });
+      return;
+    }
+    await this.reviewAction('abandon');
+  }
+
+  async executeAbandonment(): Promise<void> {
+    await this.perform('execute-abandonment', async () => {
+      await this.launch.executeAbandonment();
+      await this.reloadWorkspace();
+      this.message.set('The launch was abandoned and preserved as a read-only record.');
+    });
+  }
+
+  gateLabel(name: Exclude<LaunchGateName, 'ceremonyBroadcast'>): string {
+    return {
+      minting: 'Minting',
+      presale: 'Refundable presales',
+      purchases: 'Direct purchases',
+    }[name];
+  }
+
+  gateHelp(name: Exclude<LaunchGateName, 'ceremonyBroadcast'>): string {
+    return {
+      minting: 'Allows only reviewed collection proposals to enter the on-chain mint workflow.',
+      presale: 'Allows only approved refundable voucher reservations.',
+      purchases: 'Allows only zkPassport-approved vaults to receive system-priced purchase intents.',
+    }[name];
+  }
+
+  async confirmDecision(): Promise<void> {
+    const decision = this.pendingDecision();
+    if (!decision) return;
+    await this.perform('sign-decision', async () => {
+      if (decision.kind === 'action') {
+        const signature = await this.wallet.signLaunchAction(decision.prepared.typedData);
+        await this.launch.approveAction(decision.prepared, decision.actionType, signature);
+      } else if (decision.kind === 'plan') {
+        const signature = await this.wallet.signTypedData(decision.prepared.typedData);
+        await this.launch.signPlan(signature);
+      } else if (decision.kind === 'artifact') {
+        const signature = await this.wallet.signTypedData(decision.prepared.typedData);
+        await this.launch.signArtifact(signature);
+      } else if (decision.kind === 'rail-sign') {
+        const signature = await this.wallet.signSafeMessage(
+          decision.approval.typedData,
+          decision.approval.safe,
+        );
+        this.railOwnership.set(
+          await this.launch.signRailOwnership(decision.rail.status.phase, signature),
+        );
+      } else if (decision.kind === 'rail-broadcast') {
+        const transaction = decision.rail.status.broadcastTransaction;
+        if (!transaction) throw new Error('The reviewed Safe transaction is not ready.');
+        const transactionHash = await this.wallet.sendBaseSepoliaTransaction(transaction);
+        this.railOwnership.set(
+          await this.launch.recordRailOwnershipBroadcast(
+            decision.rail.status.phase,
+            transactionHash,
+          ),
+        );
+      } else if (decision.kind === 'rehearsal-payment') {
+        const transaction = decision.rehearsal.status.walletTransaction;
+        if (!transaction) throw new Error('The fixed rehearsal transaction is not ready.');
+        const transactionHash = await this.wallet.sendBaseSepoliaTransaction(transaction);
+        this.settlementRehearsal.set(
+          await this.launch.submitSettlementRehearsalTransaction(transactionHash),
+        );
+        this.startRehearsalPolling();
+      } else {
+        await this.launch.broadcast();
+      }
+      this.pendingDecision.set(null);
+      await this.reloadWorkspace();
+      this.message.set('The exact reviewed action was accepted.');
+    });
+  }
+
+  cancelDecision(): void {
+    this.pendingDecision.set(null);
+  }
+
+  async loadArchive(): Promise<void> {
+    await this.perform('archive', async () => {
+      this.archive.set((await this.launch.archive()).launches);
+      this.focusElement('launch-archive');
+    });
+  }
+
+  finding(id: string): ReadinessFinding | undefined {
+    return this.workspace()?.readiness.find((item) => item.id === id);
+  }
+
+  approval(actionType: LaunchActionType): ActionApproval | undefined {
+    return this.workspace()?.actionApprovals[actionType];
+  }
+
+  hasCurrentApproval(actionType: LaunchActionType): boolean {
+    const slot = this.workspace()?.session.slot;
+    return slot != null && (this.approval(actionType)?.slots ?? []).includes(slot);
+  }
+
+  statusClass(status: string): string {
+    return `status status--${status.toLowerCase().replace(/\s+/g, '-')}`;
+  }
+
+  gateOpen(name: LaunchGateName): boolean {
+    return this.workspace()?.gates[name]?.state === 'open';
+  }
+
+  formatTime(epoch?: number | null): string {
+    return epoch
+      ? new Intl.DateTimeFormat(undefined, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(epoch * 1000)
+      : 'Not available';
+  }
+
+  displayRole(role: string): string {
+    return role === 'owner' ? 'Owner' : role === 'coadmin' ? 'Coadministrator' : role;
+  }
+
+  decisionReceipt(): DecisionReceipt | null {
+    const decision = this.pendingDecision();
+    if (!decision) return null;
+    if (decision.kind === 'action') return decision.prepared.decisionReceipt;
+    if (decision.kind === 'plan' || decision.kind === 'artifact') {
+      return decision.prepared.decisionReceipt;
+    }
+    if (decision.kind === 'rail-sign' || decision.kind === 'rail-broadcast') {
+      return decision.rail.decisionReceipt;
+    }
+    if (decision.kind === 'rehearsal-payment') return decision.rehearsal.decisionReceipt;
+    return decision.receipt;
+  }
+
+  private async connectAndEnroll(kind: WalletKind): Promise<void> {
+    const token = this.enrollmentToken();
+    if (!token) throw new Error('The private administrator invitation is missing.');
+    const wallet = await this.connect(kind);
+    const prepared = await this.launch.prepareInvitation(token, wallet);
+    const signature = await this.wallet.signTypedData(prepared.typedData);
+    await this.launch.acceptInvitation(token, wallet, signature);
+    this.enrollmentToken.set(null);
+    const challenge = await this.launch.resumeChallenge(wallet);
+    const resumeSignature = await this.wallet.signLaunchAction(challenge.typedData);
+    await this.launch.resumeLogin(wallet, challenge.nonce, resumeSignature);
+    await this.reloadWorkspace();
+    this.message.set('Enrollment complete. This wallet is now mapped to its administrator role.');
+  }
+
+  private async connect(kind: WalletKind): Promise<string> {
+    return kind === 'injected'
+      ? this.wallet.connectInjected()
+      : this.wallet.connectWalletConnect({ resetSession: true });
+  }
+
+  private async advanceFunding(): Promise<void> {
+    const receipt = this.fundingReceipt();
+    const approval = this.approval('funding');
+    if (!receipt) {
+      await this.prepareFunding();
+      return;
+    }
+    if (!this.hasCurrentApproval('funding')) {
+      await this.reviewFundingApproval();
+      return;
+    }
+    if (approval?.approved && this.ownerSession() && receipt.state === 'prepared') {
+      await this.executeFunding();
+      return;
+    }
+    if (receipt.state === 'broadcast' || receipt.state === 'ambiguous') {
+      await this.confirmFunding();
+      return;
+    }
+    this.message.set('Waiting for the other required administrator approval.');
+  }
+
+  async advanceRailOwnership(): Promise<void> {
+    await this.perform('rail-ownership', async () => {
+      const rail = await this.launch.railOwnership();
+      this.railOwnership.set(rail);
+      if (rail.status.state === 'DONE') {
+        await this.reloadWorkspace();
+        this.message.set('Base Sepolia ownership is active and independently verified.');
+        return;
+      }
+      if (
+        rail.status.state === 'SCHEDULED' ||
+        rail.status.state === 'WAITING_FOR_DELAY' ||
+        rail.status.state === 'WAITING_FOR_SCHEDULE'
+      ) {
+        this.message.set(
+          rail.status.scheduledFor
+            ? `The safety delay ends ${this.formatTime(rail.status.scheduledFor)}.`
+            : 'Waiting for the reviewed schedule to appear on Base Sepolia.',
+        );
+        return;
+      }
+      const approval = this.currentRailApproval(rail);
+      if (approval && !approval.signed) {
+        this.pendingDecision.set({ kind: 'rail-sign', rail, approval });
+        return;
+      }
+      if (rail.status.broadcastTransaction) {
+        this.pendingDecision.set({ kind: 'rail-broadcast', rail });
+        return;
+      }
+      this.message.set('Waiting for the other required Safe approval.');
+    });
+  }
+
+  currentRailApproval(
+    rail: RailOwnershipResult | null = this.railOwnership(),
+  ): RailOwnershipApproval | null {
+    const wallet = this.wallet.address()?.toLowerCase();
+    if (!wallet || !rail) return null;
+    return (
+      rail.status.approvals.find((approval) =>
+        approval.allowedSigners.some((allowed) => allowed.toLowerCase() === wallet),
+      ) ?? null
+    );
+  }
+
+  railSignedCount(): number {
+    return this.railOwnership()?.status.approvals.filter((item) => item.signed).length ?? 0;
+  }
+
+  railStateLabel(): string {
+    const state = this.railOwnership()?.status.state;
+    const labels: Record<string, string> = {
+      AWAITING_APPROVALS: 'Awaiting approvals',
+      READY_TO_BROADCAST: 'Ready to submit',
+      SCHEDULED: '24-hour delay active',
+      WAITING_FOR_SCHEDULE: 'Waiting for schedule',
+      WAITING_FOR_DELAY: '24-hour delay active',
+      READY_TO_EXECUTE: 'Ready for fresh approvals',
+      DONE: 'Ownership active',
+    };
+    return state ? (labels[state] ?? state) : (this.finding('railOwnership')?.status ?? 'Waiting');
+  }
+
+  async advanceSettlementRehearsal(): Promise<void> {
+    await this.perform('settlement-rehearsal', async () => {
+      let rehearsal = await this.launch.settlementRehearsal();
+      this.settlementRehearsal.set(rehearsal);
+      if (rehearsal.status.state === 'SUCCEEDED') {
+        this.stopRehearsalPolling();
+        await this.reloadWorkspace();
+        this.message.set('Payment, SmartDeed delivery, and exact refund evidence all passed.');
+        return;
+      }
+      if (!this.coadminSession()) {
+        this.focusElement('settlement-rehearsal');
+        this.message.set('This test is assigned to either enrolled coadministrator.');
+        return;
+      }
+      if (rehearsal.status.state === 'NOT_STARTED' || rehearsal.status.state === 'FAILED') {
+        rehearsal = await this.launch.startSettlementRehearsal();
+        this.settlementRehearsal.set(rehearsal);
+      }
+      if (rehearsal.status.walletTransaction) {
+        this.pendingDecision.set({ kind: 'rehearsal-payment', rehearsal });
+        return;
+      }
+      if (
+        ['PREPARED', 'AWAITING_WALLET', 'PAYMENT_SUBMITTED', 'VALIDATING'].includes(
+          rehearsal.status.state,
+        )
+      ) {
+        this.startRehearsalPolling();
+        this.message.set(
+          rehearsal.status.message || 'The validator rehearsal is running. This page will update.',
+        );
+      }
+    });
+  }
+
+  private async advanceFinalLaunch(): Promise<void> {
+    const gate = this.workspace()?.gates.ceremonyBroadcast;
+    const approval = this.approval('gate:ceremonyBroadcast');
+    if (!gate || gate.state === 'closed' || gate.state === 'cancelled') {
+      await this.proposeLaunchWindow();
+      return;
+    }
+    if (!this.hasCurrentApproval('gate:ceremonyBroadcast')) {
+      await this.reviewAction('gate:ceremonyBroadcast');
+      return;
+    }
+    if (approval?.approved && this.ownerSession() && gate.state !== 'open') {
+      await this.activateLaunchWindow();
+      return;
+    }
+    if (gate.state === 'open' && this.ownerSession()) {
+      await this.perform('preflight', async () => {
+        const preflight = await this.launch.preflight();
+        this.pendingDecision.set({
+          kind: 'broadcast',
+          receipt: preflight.decisionReceipt,
+        });
+      });
+      return;
+    }
+    this.message.set('Waiting for the owner to open the approved launch window.');
+  }
+
+  private async reviewAction(actionType: LaunchActionType): Promise<void> {
+    await this.perform('review-action', async () => {
+      const prepared = await this.launch.prepareAction(actionType);
+      this.pendingDecision.set({ kind: 'action', actionType, prepared });
+    });
+  }
+
+  private async reviewPlanSignature(): Promise<void> {
+    if (
+      (this.workspace()?.launch.planSignatureSlots ?? []).includes(
+        this.workspace()?.session.slot ?? 0,
+      )
+    ) {
+      this.message.set('Your plan approval is recorded. Waiting for the other signer.');
+      return;
+    }
+    await this.perform('review-plan', async () => {
+      const prepared = await this.launch.preparePlanSignature();
+      this.pendingDecision.set({ kind: 'plan', prepared });
+    });
+  }
+
+  private async reviewArtifactSignature(): Promise<void> {
+    if (
+      (this.workspace()?.launch.artifactSignatureSlots ?? []).includes(
+        this.workspace()?.session.slot ?? 0,
+      )
+    ) {
+      this.message.set('Your archive signature is recorded. Waiting for the other signer.');
+      return;
+    }
+    await this.perform('review-artifact', async () => {
+      const prepared = await this.launch.prepareArtifactSignature();
+      this.pendingDecision.set({ kind: 'artifact', prepared });
+    });
+  }
+
+  private async progressLaunch(): Promise<void> {
+    await this.simpleMutation('progress', () => this.launch.progress());
+  }
+
+  private async simpleMutation(label: string, operation: () => Promise<unknown>): Promise<void> {
+    await this.perform(label, async () => {
+      await operation();
+      await this.reloadWorkspace();
+    });
+  }
+
+  private async reloadWorkspace(reissueOwner = false): Promise<void> {
+    const workspace = await this.launch.workspace();
+    this.workspace.set(workspace);
+    try {
+      this.railOwnership.set(await this.launch.railOwnership());
+    } catch {
+      this.railOwnership.set(null);
+    }
+    try {
+      const rehearsal = await this.launch.settlementRehearsal();
+      this.settlementRehearsal.set(rehearsal);
+      if (
+        ['PREPARED', 'AWAITING_WALLET', 'PAYMENT_SUBMITTED', 'VALIDATING'].includes(
+          rehearsal.status.state,
+        )
+      ) {
+        this.startRehearsalPolling();
+      } else {
+        this.stopRehearsalPolling();
+      }
+    } catch {
+      this.settlementRehearsal.set(null);
+      this.stopRehearsalPolling();
+    }
+    if (workspace.session.setup && !this.enrollmentToken() && reissueOwner) {
+      const result = await this.launch.reissueOwnerEnrollment();
+      this.enrollmentToken.set(result.ownerEnrollmentToken);
+    }
+    if (['broadcast', 'confirmed', 'artifact_signed'].includes(workspace.launch.state)) {
+      this.startProgressPolling();
+    } else {
+      this.stopProgressPolling();
+    }
+  }
+
+  private startProgressPolling(): void {
+    if (this.progressTimer) return;
+    this.progressTimer = setInterval(() => {
+      if (!this.pending()) void this.progressLaunch();
+    }, 15_000);
+  }
+
+  private stopProgressPolling(): void {
+    if (!this.progressTimer) return;
+    clearInterval(this.progressTimer);
+    this.progressTimer = null;
+  }
+
+  private startRehearsalPolling(): void {
+    if (this.rehearsalTimer) return;
+    this.rehearsalTimer = setInterval(() => {
+      if (!this.pending()) void this.pollSettlementRehearsal();
+    }, 10_000);
+  }
+
+  private stopRehearsalPolling(): void {
+    if (!this.rehearsalTimer) return;
+    clearInterval(this.rehearsalTimer);
+    this.rehearsalTimer = null;
+  }
+
+  private async pollSettlementRehearsal(): Promise<void> {
+    const result = await this.perform('poll-rehearsal', () =>
+      this.launch.settlementRehearsal(),
+    );
+    if (!result) return;
+    this.settlementRehearsal.set(result);
+    if (result.status.state === 'SUCCEEDED' || result.status.state === 'FAILED') {
+      this.stopRehearsalPolling();
+      await this.reloadWorkspace();
+    }
+  }
+
+  private resolveStageIndex(): number {
+    const workspace = this.workspace();
+    if (!workspace) return 0;
+    if (this.finding('release')?.status !== 'Healthy') return 0;
+    if (this.enrolledCount() < 3) return 1;
+    if (this.finding('railOwnership')?.status !== 'Healthy') return 2;
+    if (this.finding('settlement')?.status !== 'Healthy') return 3;
+    if (this.finding('funding')?.status !== 'Healthy') return 4;
+    const state = workspace.launch.state;
+    if (state === 'roster_open' || state === 'roster_frozen') return 5;
+    if (state === 'planned') return 6;
+    if (state === 'plan_approved') return 7;
+    if (['broadcast', 'confirmed', 'artifact_pending', 'artifact_signed'].includes(state)) return 8;
+    return 9;
+  }
+
+  private nextActionLabel(): string {
+    const action = this.workspace()?.nextTask.action;
+    const labels: Record<string, string> = {
+      enrollment: 'Review administrator team',
+      railOwnership: 'Continue rail ownership',
+      settlementRehearsal: 'Run settlement rehearsal',
+      funding: 'Continue ceremony funding',
+      freezeRoster: 'Confirm administrator team',
+      buildPlan: 'Build launch plan',
+      signPlan: 'Review and approve plan',
+      preflight: 'Prepare final launch',
+      confirm: 'Check chain confirmation',
+      createArtifact: 'Build launch archive',
+      signArtifact: 'Review and sign archive',
+      finalize: 'Seal launch archive',
+      openOperations: 'Open operations dashboard',
+      refresh: 'Refresh launch status',
+    };
+    return action ? (labels[action] ?? 'Continue') : 'Refresh';
+  }
+
+  private consumeFragment(): void {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const owner = params.get('launch-owner');
+    const invitation = params.get('launch-invite');
+    if (owner) this.ownerToken.set(owner);
+    if (invitation) this.enrollmentToken.set(invitation);
+    if (owner || invitation) {
+      window.history.replaceState(
+        null,
+        document.title,
+        `${window.location.pathname}${window.location.search}`,
+      );
+    }
+  }
+
+  private invitationUrl(invitation: LaunchInvitation): string {
+    if (typeof window === 'undefined') return invitation.invitationFragment;
+    return `${window.location.origin}${window.location.pathname}${invitation.invitationFragment}`;
+  }
+
+  private async copyText(value: string): Promise<void> {
+    if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable.');
+    await navigator.clipboard.writeText(value);
+  }
+
+  private focusElement(id: string): void {
+    if (typeof document === 'undefined') return;
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  private async perform<T>(label: string, operation: () => Promise<T>): Promise<T | undefined> {
+    if (this.pending()) return undefined;
+    this.pending.set(label);
+    this.error.set(null);
+    try {
+      return await operation();
+    } catch (error) {
+      const detail = formatError(error);
+      if (/unknown error|http failure response.*:\s*0\b/i.test(detail)) {
+        this.error.set(
+          'The administrator service could not be reached. No action is available. Try again after the service is restored.',
+        );
+      } else if (/\b401\b|unauthori[sz]ed|session expired/i.test(detail)) {
+        this.error.set('Your administrator session expired. Sign in with your enrolled wallet again.');
+      } else {
+        this.error.set(detail);
+      }
+      return undefined;
+    } finally {
+      this.pending.set(null);
+    }
+  }
 }
