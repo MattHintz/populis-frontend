@@ -134,14 +134,28 @@ jobs:
             set -euo pipefail
             sha="${{ inputs.release_sha }}"
             root="${{ vars.SOLSLOT_ADMIN_RELEASE_ROOT }}"
+            mount_path="${{ vars.SOLSLOT_ADMIN_MOUNT_PATH }}"
             public_url="${{ vars.SOLSLOT_ADMIN_PUBLIC_URL }}"
             expected_host="${{ vars.SOLSLOT_ADMIN_EXPECTED_HOSTNAME }}"
             archive="/tmp/solslot-admin-$sha.tgz"
             release_dir="$root/releases/$sha"
             test -n "$root"
+            test -n "$mount_path"
             test -n "$public_url"
             test -n "$expected_host"
+            case "$mount_path" in
+              /*/genesis-admin) ;;
+              *)
+                echo "SOLSLOT_ADMIN_MOUNT_PATH must be an absolute genesis-admin path." >&2
+                exit 1
+                ;;
+            esac
             test "$(hostname)" = "$expected_host"
+            test -d "$(dirname "$mount_path")"
+            if [ -e "$mount_path" ] && [ ! -L "$mount_path" ]; then
+              echo "Refusing to replace non-symlink admin mount $mount_path." >&2
+              exit 1
+            fi
             cd /tmp
             sha256sum -c "$(basename "$archive").sha256"
             sudo mkdir -p "$root/releases"
@@ -162,6 +176,8 @@ jobs:
             previous="$(readlink -f "$root/current" || true)"
             sudo ln -sfn "$release_dir" "$root/current.next"
             sudo mv -Tf "$root/current.next" "$root/current"
+            sudo ln -sfn "$root/current" "$mount_path.next"
+            sudo mv -Tf "$mount_path.next" "$mount_path"
             sudo systemctl reload apache2
             verify_host="${public_url#https://}"
             verify_host="${verify_host%%/*}"
@@ -200,11 +216,19 @@ jobs:
             sha="${{ inputs.rollback_release }}"
             [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
             root="${{ vars.SOLSLOT_ADMIN_RELEASE_ROOT }}"
+            mount_path="${{ vars.SOLSLOT_ADMIN_MOUNT_PATH }}"
             release_dir="$root/releases/$sha"
             test -f "$release_dir/.release-ready"
             test -f "$release_dir/.release-verified"
             sudo ln -sfn "$release_dir" "$root/current.next"
             sudo mv -Tf "$root/current.next" "$root/current"
+            test -d "$(dirname "$mount_path")"
+            if [ -e "$mount_path" ] && [ ! -L "$mount_path" ]; then
+              echo "Refusing to replace non-symlink admin mount $mount_path." >&2
+              exit 1
+            fi
+            sudo ln -sfn "$root/current" "$mount_path.next"
+            sudo mv -Tf "$mount_path.next" "$mount_path"
             sudo systemctl reload apache2
             public_url="${{ vars.SOLSLOT_ADMIN_PUBLIC_URL }}"
             verify_host="${public_url#https://}"
