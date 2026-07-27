@@ -151,11 +151,12 @@ interface ParsedExecutionPackage {
             Admin desk
           </a>
           <div class="mono text-[0.7rem] uppercase tracking-[0.25em] text-brand mt-4 mb-2">
-            Pool Economic V2
+            Secondary market
           </div>
-          <h1 class="font-display text-4xl md:text-5xl">Redemption economics.</h1>
+          <h1 class="font-display text-4xl md:text-5xl">SOLS liquidity</h1>
           <p class="mt-3 text-sm text-text-muted max-w-2xl">
-            Global pool-token NAV, deed swaps, burns, reserve-first acquisitions.
+            Review the governed SOLS pool and its SmartDeed swap capacity. SOLS is a
+            secondary-market asset and never replaces the approved primary purchase rails.
           </p>
         </div>
       </header>
@@ -163,7 +164,7 @@ interface ParsedExecutionPackage {
       <section class="chain-panel mt-10" data-testid="chain-state-panel">
         <div class="chain-panel__head">
           <div>
-            <div class="mono text-xs uppercase text-text-muted">On-chain pool state</div>
+            <div class="mono text-xs uppercase text-text-muted">Verified on Testnet11</div>
             <h2 class="font-display text-2xl mt-1">{{ chainStatusTitle() }}</h2>
             <div class="mono text-[0.7rem] text-text-muted mt-1 break-all">
               {{ chainStatusDetail() }}
@@ -195,19 +196,19 @@ interface ParsedExecutionPackage {
           @if (evidence.kind === 'confirmed') {
             <dl class="metric-grid metric-grid--wide mt-4">
               <div>
-                <dt>Total NAV locked</dt>
+                <dt>Property value represented</dt>
                 <dd>{{ formatMojos(evidence.state.totalNavLockedMojos) }}</dd>
               </div>
               <div>
-                <dt>Deeds</dt>
+                <dt>SmartDeeds in pool</dt>
                 <dd>{{ formatTokens(evidence.state.deedCount) }}</dd>
               </div>
               <div>
-                <dt>Total supply</dt>
+                <dt>Total SOLS supply</dt>
                 <dd>{{ formatTokens(evidence.state.totalPoolTokenSupply) }}</dd>
               </div>
               <div>
-                <dt>Treasury reserve</dt>
+                <dt>SOLS held for swaps</dt>
                 <dd>{{ formatTokens(evidence.state.treasuryReserveTokens) }}</dd>
               </div>
               <div>
@@ -230,6 +231,15 @@ interface ParsedExecutionPackage {
           </div>
         }
       </section>
+
+      <aside class="mt-4 border-l-2 border-brand bg-brand-soft p-4 text-sm text-text-muted">
+        <strong class="text-text">What this controls</strong>
+        <span class="block mt-1">
+          Administrators can verify governed NAV, reserve capacity, and exact swap bundles here.
+          Customers see a SOLS swap only when the pool owns the selected SmartDeed, liquidity is
+          confirmed, and their vault has a confirmed zkPassport credential.
+        </span>
+      </aside>
 
       <div class="mt-10 grid gap-6 xl:grid-cols-[minmax(280px,420px)_1fr]">
         <form class="grid gap-6" aria-label="Pool Economic V2 inputs">

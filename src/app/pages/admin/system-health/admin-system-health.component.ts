@@ -9,14 +9,19 @@ import {
   CollectionApiService,
   CollectionFeatureStatus,
 } from '../../../services/collection-api.service';
+import {
+  SolsMarketApiService,
+  SolsMarketSnapshot,
+} from '../../../services/sols-market-api.service';
 import { formatError } from '../../../utils/format-error';
 
-interface HealthCheck {
+export interface HealthCheck {
   id: string;
   title: string;
   status: 'Healthy' | 'Waiting' | 'Blocked';
   impact: string;
   evidence?: unknown;
+  route?: string;
 }
 
 @Component({
@@ -48,6 +53,9 @@ interface HealthCheck {
             <div>
               <strong>{{ check.title }}</strong>
               <p>{{ check.impact }}</p>
+              @if (check.route) {
+                <a class="check-link" [routerLink]="check.route">Open this work area</a>
+              }
               @if (check.evidence) {
                 <details>
                   <summary>Technical evidence</summary>
@@ -82,6 +90,8 @@ interface HealthCheck {
       .health-list article > div { display:grid; gap:5px; } .health-list p { margin:0; }
       .status { padding:5px 7px; border:1px solid #4f8d77; color:#e8c66a; font:700 11px monospace; text-align:center; }
       .status--healthy { color:#67e7ad; } .status--blocked { color:#ffb49f; border-color:#844f4f; }
+      .check-link { width:max-content; color:#8bf0bd; font-size:12px; text-decoration:none; }
+      .check-link:hover { text-decoration:underline; }
       details { margin-top:8px; } summary { cursor:pointer; color:#8fb5a6; font-size:11px; }
       pre { max-height:260px; overflow:auto; padding:12px; background:#04100d; color:#bce8d5; font:11px monospace; }
       aside { display:grid; grid-template-columns:auto 1fr; gap:12px; margin-top:18px; padding:15px; border-left:3px solid #67e7ad; background:#0a1a16; }
@@ -94,6 +104,7 @@ interface HealthCheck {
 export class AdminSystemHealthComponent {
   private readonly http = inject(HttpClient);
   private readonly collections = inject(CollectionApiService);
+  private readonly solsMarket = inject(SolsMarketApiService);
   readonly checks = signal<HealthCheck[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
@@ -105,18 +116,30 @@ export class AdminSystemHealthComponent {
   async reload(): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
-    const [feature, node, protocol, launch] = await Promise.allSettled([
+    const [feature, node, protocol, launch, solsMarket] = await Promise.allSettled([
       this.collections.featureStatus(),
       firstValueFrom(this.http.get<unknown>(`${environment.faucetApi}/chia/provider-status`)),
       firstValueFrom(this.http.get<unknown>(`${environment.faucetApi}/protocol`)),
       firstValueFrom(this.http.get<{ enabled: boolean; network: string }>(
         `${environment.faucetApi}/admin/launch/public`,
       )),
+      this.solsMarket.readMarket(),
     ]);
     const result: HealthCheck[] = [];
     result.push(this.featureCheck(feature));
     result.push(this.requestCheck('chia', 'Chia network provider', node, 'Testnet11 chain reads are available.'));
     result.push(this.requestCheck('protocol', 'Protocol coordinates', protocol, 'Signed protocol coordinates are available to the applications.'));
+    result.push(
+      solsMarket.status === 'fulfilled'
+        ? solsMarketHealthCheck(solsMarket.value)
+        : {
+            id: 'sols-pool',
+            title: 'SOLS secondary market',
+            status: 'Blocked',
+            impact: 'The customer-facing SOLS market could not be verified.',
+            route: '/admin/pool-economics-v2',
+          },
+    );
     result.push(
       launch.status === 'fulfilled' && launch.value.enabled
         ? {
@@ -134,7 +157,7 @@ export class AdminSystemHealthComponent {
           },
     );
     this.checks.set(result);
-    const failures = [feature, node, protocol, launch]
+    const failures = [feature, node, protocol, launch, solsMarket]
       .filter((item): item is PromiseRejectedResult => item.status === 'rejected')
       .map((item) => formatError(item.reason));
     this.error.set(failures.length ? [...new Set(failures)].join(' ') : null);
@@ -177,4 +200,40 @@ export class AdminSystemHealthComponent {
       ? { id, title, status: 'Healthy', impact: healthyImpact, evidence: result.value }
       : { id, title, status: 'Blocked', impact: `${title} could not be verified.` };
   }
+}
+
+export function solsMarketHealthCheck(market: SolsMarketSnapshot): HealthCheck {
+  const route = '/admin/pool-economics-v2';
+  if (market.rejectedCandidateCount > 0) {
+    return {
+      id: 'sols-pool',
+      title: 'SOLS secondary market',
+      status: 'Blocked',
+      impact:
+        `${market.rejectedCandidateCount} executed SmartDeed candidate` +
+        `${market.rejectedCandidateCount === 1 ? '' : 's'} failed chain verification and remain hidden from customers.`,
+      evidence: market,
+      route,
+    };
+  }
+  if (market.outcome !== 'READY') {
+    return {
+      id: 'sols-pool',
+      title: 'SOLS secondary market',
+      status: 'Waiting',
+      impact: market.title,
+      evidence: market,
+      route,
+    };
+  }
+  return {
+    id: 'sols-pool',
+    title: 'SOLS secondary market',
+    status: 'Healthy',
+    impact:
+      `${market.verifiedOpportunityCount} chain-verified SmartDeed swap` +
+      `${market.verifiedOpportunityCount === 1 ? ' is' : 's are'} visible to eligible customer vaults.`,
+    evidence: market,
+    route,
+  };
 }

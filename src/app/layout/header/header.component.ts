@@ -24,7 +24,7 @@ import { SessionService } from '../../services/session.service';
         </a>
         <nav class="hidden lg:flex items-center gap-5 text-sm text-text-muted">
           <a routerLink="/" routerLinkActive="text-text" [routerLinkActiveOptions]="{ exact: true }" class="hover:text-text transition">Status</a>
-          <a routerLink="/offers" routerLinkActive="text-text" class="hover:text-text transition">Offers</a>
+          <a routerLink="/admin/pool-economics-v2" routerLinkActive="text-text" class="hover:text-text transition">SOLS market</a>
           <a routerLink="/committee" routerLinkActive="text-text" class="hover:text-text transition">Committee</a>
           <a routerLink="/vault" routerLinkActive="text-text" class="hover:text-text transition" *ngIf="session.session()">My Vault</a>
           <a href="/" class="hover:text-text transition">Market</a>

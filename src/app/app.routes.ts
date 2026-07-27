@@ -30,19 +30,12 @@ export const routes: Routes = [
   },
   {
     path: 'offers',
-    loadComponent: () =>
-      import('./pages/offers/offer-list.component').then(
-        (m) => m.OfferListComponent,
-      ),
-    title: 'SmartDeed Offers · Solslot',
+    redirectTo: 'admin/pool-economics-v2',
+    pathMatch: 'full',
   },
   {
     path: 'offers/:id',
-    loadComponent: () =>
-      import('./pages/offers/offer-detail.component').then(
-        (m) => m.OfferDetailComponent,
-      ),
-    title: 'SmartDeed Offer · Solslot',
+    redirectTo: 'admin/pool-economics-v2',
   },
   {
     path: 'properties/:id',
