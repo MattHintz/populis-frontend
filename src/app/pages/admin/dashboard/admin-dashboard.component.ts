@@ -121,7 +121,7 @@ interface DeskTask {
           </dl>
         </a>
 
-        <a routerLink="/admin/pool-economics-v2" class="desk-tile">
+        <a routerLink="/admin/sols-liquidity" class="desk-tile">
           <span class="eyebrow">Secondary market</span>
           <strong>SOLS liquidity</strong>
           <p>Review the live SOLS pool, SmartDeeds available for swap, reserves, and governed NAV.</p>

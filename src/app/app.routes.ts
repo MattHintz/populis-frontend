@@ -133,13 +133,18 @@ export const routes: Routes = [
     pathMatch: 'full',
   },
   {
-    path: 'admin/pool-economics-v2',
+    path: 'admin/sols-liquidity',
     canActivate: [adminAuthGuard],
     loadComponent: () =>
-      import('./pages/admin/pool-economics-v2/pool-economics-v2.component').then(
-        (m) => m.PoolEconomicsV2Component,
+      import('./pages/admin/sols-liquidity/sols-liquidity.component').then(
+        (m) => m.SolsLiquidityComponent,
       ),
-    title: 'Pool Economic V2 · Solslot',
+    title: 'SOLS Liquidity · Solslot',
+  },
+  {
+    path: 'admin/pool-economics-v2',
+    redirectTo: 'admin/sols-liquidity',
+    pathMatch: 'full',
   },
   {
     path: 'admin/legacy-recall',

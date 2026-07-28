@@ -203,7 +203,7 @@ export class AdminSystemHealthComponent {
 }
 
 export function solsMarketHealthCheck(market: SolsMarketSnapshot): HealthCheck {
-  const route = '/admin/pool-economics-v2';
+  const route = '/admin/sols-liquidity';
   if (market.rejectedCandidateCount > 0) {
     return {
       id: 'sols-pool',

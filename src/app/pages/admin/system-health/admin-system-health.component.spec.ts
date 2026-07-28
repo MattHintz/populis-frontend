@@ -14,7 +14,7 @@ describe('SOLS market health', () => {
 
     expect(check.status).toBe('Waiting');
     expect(check.impact).toContain('after protocol launch');
-    expect(check.route).toBe('/admin/pool-economics-v2');
+    expect(check.route).toBe('/admin/sols-liquidity');
   });
 
   it('waits when the pool has no verified customer inventory', () => {
@@ -53,12 +53,13 @@ function market(
   overrides: Partial<SolsMarketSnapshot> = {},
 ): SolsMarketSnapshot {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     network: 'testnet11',
     outcome: 'WAITING',
     title: 'Waiting for SOLS',
     body: 'Nothing is exposed until chain verification passes.',
     pool: null,
+    statutes: null,
     navRegistry: null,
     opportunities: [],
     verifiedOpportunityCount: 0,
