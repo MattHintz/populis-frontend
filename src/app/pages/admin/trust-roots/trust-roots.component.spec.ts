@@ -36,7 +36,7 @@ describe('TrustRootsComponent', () => {
 
     expect(text).toContain('Signed artifact verified');
     expect(text).toContain('SGT genesis');
-    expect(text).toContain('Pool V3');
+    expect(text).toContain('Pool V4');
     expect(text).toContain('Protocol DID');
     expect(text).toContain('Governance');
     expect(text).toContain('NAV registry');

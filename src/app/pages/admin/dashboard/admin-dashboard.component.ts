@@ -13,6 +13,10 @@ import {
   CollectionWorkspace,
   PresaleSeries,
 } from '../../../services/collection-api.service';
+import {
+  SolsMarketApiService,
+  SolsMarketSnapshot,
+} from '../../../services/sols-market-api.service';
 import { formatError } from '../../../utils/format-error';
 
 interface DeskTask {
@@ -117,10 +121,20 @@ interface DeskTask {
           </dl>
         </a>
 
+        <a routerLink="/admin/sols-liquidity" class="desk-tile">
+          <span class="eyebrow">Secondary market</span>
+          <strong>SOLS liquidity</strong>
+          <p>Review the live SOLS pool, SmartDeeds available for swap, reserves, and governed NAV.</p>
+          <dl>
+            <div><dt>Customer view</dt><dd>{{ solsMarket()?.outcome || 'Checking' }}</dd></div>
+            <div><dt>Verified swaps</dt><dd>{{ solsMarket()?.verifiedOpportunityCount || 0 }}</dd></div>
+          </dl>
+        </a>
+
         <a routerLink="/admin/system-health" class="desk-tile">
           <span class="eyebrow">Readiness</span>
           <strong>System health</strong>
-          <p>See release, node, rail, media, and write-gate outcomes in ordinary language.</p>
+          <p>See release, node, rail, SOLS pool, media, and write-gate outcomes in ordinary language.</p>
           <dl>
             <div><dt>Drafting</dt><dd>{{ feature()?.metadataEnabled ? 'Available' : 'Locked' }}</dd></div>
             <div><dt>Minting</dt><dd>{{ feature()?.mintingEnabled ? 'Open' : 'Closed' }}</dd></div>
@@ -217,12 +231,14 @@ interface DeskTask {
 export class AdminDashboardComponent {
   private readonly collectionApi = inject(CollectionApiService);
   private readonly approvalApi = inject(AdminOperationApprovalService);
+  private readonly solsMarketApi = inject(SolsMarketApiService);
   private readonly session = inject(AdminSessionService);
 
   readonly feature = signal<CollectionFeatureStatus | null>(null);
   readonly collections = signal<CollectionWorkspace[]>([]);
   readonly approvals = signal<AdminOperationApproval[]>([]);
   readonly presales = signal<PresaleSeries[]>([]);
+  readonly solsMarket = signal<SolsMarketSnapshot | null>(null);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly subject = this.session.subject;
@@ -315,11 +331,12 @@ export class AdminDashboardComponent {
     this.loading.set(true);
     this.error.set(null);
     const errors: string[] = [];
-    const [feature, collections, approvals, presales] = await Promise.allSettled([
+    const [feature, collections, approvals, presales, solsMarket] = await Promise.allSettled([
       this.collectionApi.featureStatus(),
       this.collectionApi.list(),
       this.approvalApi.list('active'),
       this.collectionApi.listPresales(),
+      this.solsMarketApi.readMarket(),
     ]);
     if (feature.status === 'fulfilled') this.feature.set(feature.value);
     else errors.push(formatError(feature.reason));
@@ -329,6 +346,8 @@ export class AdminDashboardComponent {
     else errors.push(formatError(approvals.reason));
     if (presales.status === 'fulfilled') this.presales.set(presales.value);
     else errors.push(formatError(presales.reason));
+    if (solsMarket.status === 'fulfilled') this.solsMarket.set(solsMarket.value);
+    else errors.push(formatError(solsMarket.reason));
     this.error.set(errors.length ? [...new Set(errors)].join(' ') : null);
     this.loading.set(false);
   }

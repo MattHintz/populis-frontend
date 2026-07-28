@@ -358,7 +358,7 @@ function buildRoots(artifact: SolslotPublicArtifact | null): TrustRootView[] {
       expectedHash: artifact.sgtTailHash,
       kind: 'coin',
     },
-    singletonRoot('pool', 'Pool V3', 'Only deployable deed liquidity pool.', artifact),
+    singletonRoot('pool', 'Pool V4', 'Only deployable deed liquidity pool.', artifact),
     singletonRoot('did', 'Protocol DID', 'Canonical protocol identity root.', artifact),
     singletonRoot(
       'governance',
