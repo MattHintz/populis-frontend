@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import {
   SolsLiquidityVenue,
   SolsMarketApiService,
@@ -21,16 +22,16 @@ interface VenueCandidate {
 @Component({
   selector: 'solslot-admin-sols-liquidity',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, AdminWorkspaceNavComponent],
   template: `
+    <solslot-admin-workspace-nav />
     <main class="liquidity-desk">
       <header>
         <div>
-          <a routerLink="/admin" class="back-link">Admin desk</a>
           <span class="eyebrow">Secondary market</span>
           <h1>SOLS liquidity</h1>
           <p>
-            Monitor protocol SmartDeed swaps and the external pools approved by SGT governance.
+            See SmartDeeds available for SOLS and the external pools approved by SGT holders.
           </p>
         </div>
         <button type="button" (click)="reload()" [disabled]="loading()">
@@ -86,7 +87,7 @@ interface VenueCandidate {
           </dl>
         } @else {
           <div class="empty">
-            Pool V4 has not reconstructed from the signed Testnet11 release yet.
+            The protocol market is waiting for its confirmed launch state.
           </div>
         }
 
@@ -115,7 +116,7 @@ interface VenueCandidate {
             <span class="eyebrow">External liquidity</span>
             <h2 id="venue-title">Governed venues</h2>
             <p>
-              Solslot routes only through an exact pool recorded as active in the statutes singleton.
+              Solslot uses only pools that are active under the current governed rules.
             </p>
           </div>
           <a routerLink="/committee">Open SGT committee</a>
@@ -131,7 +132,7 @@ interface VenueCandidate {
                   <small>Pool {{ shortHex(venue.poolId) }}</small>
                 </div>
                 <details>
-                  <summary>Verification evidence</summary>
+                  <summary>On-chain evidence</summary>
                   <dl>
                     <div><dt>Chain</dt><dd>{{ venue.chainId }}</dd></div>
                     <div><dt>Protocol</dt><dd>{{ venue.protocolId }}</dd></div>
@@ -159,7 +160,7 @@ interface VenueCandidate {
         <div class="section-heading">
           <div>
             <span class="eyebrow">Venue roadmap</span>
-            <h2 id="candidate-title">Reviewed candidates</h2>
+            <h2 id="candidate-title">Pools being evaluated</h2>
           </div>
         </div>
         <div class="candidate-grid">
@@ -182,7 +183,7 @@ interface VenueCandidate {
       </section>
 
       <aside>
-        <strong>Community pools are permissionless, not protocol trusted</strong>
+        <strong>Community pools are separate from approved Solslot routes</strong>
         <span>
           A community may create another pool without Solslot approval. It remains community-run:
           no trusted badge, no automatic routing, and no authority inherited from a token symbol,

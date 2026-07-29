@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import { ChiaSingletonReaderService } from '../../../services/chia-singleton-reader.service';
 import { CoinsetService } from '../../../services/coinset.service';
 import {
@@ -47,8 +48,9 @@ interface TrustRootView {
 @Component({
   selector: 'pp-trust-roots',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, AdminWorkspaceNavComponent],
   template: `
+    <solslot-admin-workspace-nav />
     <section class="container-p py-12 md:py-16">
       <header class="flex flex-wrap items-end justify-between gap-6">
         <div>

@@ -1,3 +1,10 @@
+@if (workspace()) {
+  <solslot-admin-workspace-nav
+    [externalSignOut]="true"
+    (signOutRequested)="logout()"
+  />
+}
+
 <main class="launch-shell">
   @if (error()) {
     <div class="launch-alert launch-alert--error" role="alert">
@@ -119,7 +126,6 @@
       </div>
       <div class="launch-header__actions">
         <span class="wallet-label">{{ connectedWalletLabel() }}</span>
-        <button type="button" class="btn btn--ghost" (click)="logout()">Sign out</button>
       </div>
     </header>
 
@@ -479,7 +485,7 @@
             <div class="section-heading">
               <div>
                 <span class="eyebrow">Required before customer sales</span>
-                <h2>Prove the payment path</h2>
+                <h2>Run the customer payment check</h2>
               </div>
               <span
                 [class]="
@@ -500,8 +506,8 @@
               </span>
             </div>
             <p>
-              Complete one test delivery and one full refund before customer sales can open. Only
-              Base Sepolia test USDC is used.
+              Use the same test SmartDeed twice. The first payment must deliver it. The second must
+              return every test dollar because that deed is no longer available.
             </p>
             <ol class="payment-checklist" aria-label="Customer payment activation steps">
               <li [class.is-complete]="rehearsalCompleted(1)">
@@ -522,7 +528,7 @@
                 <span>3</span>
                 <div>
                   <strong>Prove a full refund</strong>
-                  <small>A second test payment must return to the same wallet in full.</small>
+                  <small>Pay the same amount for the same deed and confirm every test dollar returns.</small>
                 </div>
               </li>
               <li [class.is-complete]="rehearsalCompleted(4)">
@@ -608,16 +614,17 @@
           <section class="workspace-section" aria-labelledby="operation-windows-title">
             <div class="section-heading">
               <div>
-                <span class="eyebrow">Owner plus one · 30 minutes</span>
-                <h2 id="operation-windows-title">Operational write windows</h2>
+                <span class="eyebrow">Owner + coadmin approval · 30 minutes</span>
+                <h2 id="operation-windows-title">Choose what can go live</h2>
               </div>
               <button type="button" class="btn btn--primary" (click)="openOperations()">
                 Open operations dashboard
               </button>
             </div>
             <p>
-              Drafting and review remain available. Each chain-writing operation opens separately,
-              closes automatically, and cannot override the server emergency lock.
+              Open only the activity your team is ready to supervise. Each opening closes
+              automatically. Drafting stays available, and payments already in progress continue
+              safely through delivery or refund.
             </p>
             <div class="operation-window-list">
               @for (name of operationGateNames; track name) {
@@ -634,7 +641,7 @@
                           : 'status status--waiting'
                       "
                     >
-                      {{ gateOpen(name) ? 'Open' : 'Closed' }}
+                      {{ gateOpen(name) ? 'Open for new activity' : 'Closed to new activity' }}
                     </span>
                     @if (gateOpen(name)) {
                       <small>Closes {{ formatTime(workspace()!.gates[name]?.closesAt) }}</small>
@@ -652,7 +659,7 @@
                         "
                         (click)="reviewOperationWindow(name)"
                       >
-                        Review window
+                        Review 30-minute opening
                       </button>
                     }
                     @if (
@@ -669,7 +676,7 @@
                         "
                         (click)="activateOperationWindow(name)"
                       >
-                        Open approved window
+                        Open for 30 minutes
                       </button>
                     }
                     @if (name !== 'minting' && !customerPaymentsReady()) {

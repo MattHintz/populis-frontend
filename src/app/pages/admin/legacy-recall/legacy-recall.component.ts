@@ -1,8 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import {
   LegacyProRecallRecord,
   LegacyProRecallService,
@@ -12,8 +11,9 @@ import { formatError } from '../../../utils/format-error';
 @Component({
   selector: 'pp-legacy-recall',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, AdminWorkspaceNavComponent],
   template: `
+    <solslot-admin-workspace-nav />
     <section class="container-p pt-12 pb-24">
       <header class="flex flex-wrap items-end justify-between gap-6">
         <div>
@@ -26,7 +26,6 @@ import { formatError } from '../../../utils/format-error';
           </p>
         </div>
 
-        <a routerLink="/admin" class="btn btn--ghost">Admin desk</a>
       </header>
 
       <form class="mt-10 recall-search" (ngSubmit)="search()">

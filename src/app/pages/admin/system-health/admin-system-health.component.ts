@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import {
   CollectionApiService,
   CollectionFeatureStatus,
@@ -27,17 +28,17 @@ export interface HealthCheck {
 @Component({
   selector: 'solslot-admin-system-health',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, AdminWorkspaceNavComponent],
   template: `
+    <solslot-admin-workspace-nav />
     <main class="health-desk">
       <header>
         <div>
-          <span class="eyebrow">Outcome-first monitoring</span>
+          <span class="eyebrow">Readiness</span>
           <h1>System health</h1>
-          <p>See what administrators and customers can safely do right now.</p>
+          <p>See what is working, what is waiting, and what each issue affects.</p>
         </div>
         <div class="actions">
-          <a routerLink="/admin">Dashboard</a>
           <button type="button" (click)="reload()" [disabled]="loading()">Refresh checks</button>
         </div>
       </header>
@@ -68,10 +69,10 @@ export interface HealthCheck {
       </section>
 
       <aside>
-        <strong>Write gates remain closed by default</strong>
+        <strong>Closed means protected</strong>
         <span>
-          Drafting and review can continue while ceremony, minting, presale, and purchase writes
-          stay blocked. A signed timed window cannot override the server's emergency ceiling.
+          Property preparation and review can continue while launch, minting, presale, or
+          purchase actions remain closed. Only the approved workflow can open a timed action.
         </span>
       </aside>
     </main>

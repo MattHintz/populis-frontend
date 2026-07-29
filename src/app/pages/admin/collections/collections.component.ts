@@ -3,13 +3,13 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import {
   CollectionApiService,
   CollectionFeatureStatus,
   CollectionState,
   CollectionWorkspace,
 } from '../../../services/collection-api.service';
-import { AdminSessionService } from '../../../services/admin-session.service';
 import { formatError } from '../../../utils/format-error';
 
 type StateFilter = 'ALL' | CollectionState;
@@ -17,20 +17,24 @@ type StateFilter = 'ALL' | CollectionState;
 @Component({
   selector: 'pp-admin-collections',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, AdminWorkspaceNavComponent],
   template: `
+    <solslot-admin-workspace-nav />
     <main class="collection-index">
       <header class="desk-header">
         <div>
-          <div class="eyebrow">Solslot Admin Desk</div>
-          <h1>Collection minting</h1>
-          <p>Prepare investor dossiers, verify every asset, and govern SmartDeed issuance.</p>
+          <div class="eyebrow">Property workspace</div>
+          <h1>Collections</h1>
+          <p>Prepare a property once, then manage its documents, ownership plan, review, and SmartDeeds.</p>
         </div>
         <div class="desk-actions">
-          <a routerLink="/admin/omnichain-activation" class="btn btn--ghost">Rail handoff</a>
-          <a routerLink="/admin/trust-roots" class="btn btn--ghost">Trust roots</a>
-          <button type="button" class="btn btn--primary" (click)="createOpen.set(true)">
-            New collection
+          <button
+            type="button"
+            class="btn btn--primary"
+            (click)="createOpen.set(true)"
+            [disabled]="feature()?.metadataEnabled === false"
+          >
+            Add property
           </button>
         </div>
       </header>
@@ -38,13 +42,14 @@ type StateFilter = 'ALL' | CollectionState;
       @if (feature(); as flags) {
         @if (!flags.metadataEnabled) {
           <section class="notice notice--locked">
-            <strong>Metadata workspace is disabled</strong>
-            <span>The API feature flag must be enabled before drafts can be created.</span>
+            <strong>Property drafting is not available on this server</strong>
+            <span>Open System Health to see which release setting is keeping it closed.</span>
+            <a routerLink="/admin/system-health">Open System Health</a>
           </section>
         } @else if (!flags.mintingEnabled) {
           <section class="notice">
-            <strong>Draft and review mode</strong>
-            <span>On-chain publication remains locked by the minting feature flag.</span>
+            <strong>Preparation is open; publishing is closed</strong>
+            <span>You can complete and review the property now. No SmartDeed can be published yet.</span>
           </section>
         }
       }
@@ -59,7 +64,7 @@ type StateFilter = 'ALL' | CollectionState;
             {{ state === 'ALL' ? 'All' : stateLabel(state) }}
           </button>
         }
-        <span class="filter-count">{{ filtered().length }} collections</span>
+        <span class="filter-count">{{ filtered().length }} {{ filtered().length === 1 ? 'property' : 'properties' }}</span>
       </nav>
 
       @if (loading()) {
@@ -72,8 +77,8 @@ type StateFilter = 'ALL' | CollectionState;
         </section>
       } @else if (!filtered().length) {
         <section class="empty-state">
-          <strong>No collections in this view</strong>
-          <span>Create one workspace for the property and all planned SmartDeeds.</span>
+          <strong>No properties in this view</strong>
+          <span>Add a property to begin its shared collection workspace.</span>
         </section>
       } @else {
         <div class="collection-table" role="table" aria-label="Property collections">
@@ -110,10 +115,6 @@ type StateFilter = 'ALL' | CollectionState;
         </div>
       }
 
-      <footer class="desk-footer">
-        <span class="mono">{{ subject() }}</span>
-        <button type="button" (click)="logout()">Sign out</button>
-      </footer>
     </main>
 
     @if (createOpen()) {
@@ -122,7 +123,7 @@ type StateFilter = 'ALL' | CollectionState;
         <form class="dialog" (ngSubmit)="create()">
           <header>
             <div class="eyebrow">New workspace</div>
-            <h2>Create property collection</h2>
+            <h2>Add a property</h2>
           </header>
           <label>
             Property title
@@ -145,7 +146,7 @@ type StateFilter = 'ALL' | CollectionState;
               Cancel
             </button>
             <button type="submit" class="btn btn--primary" [disabled]="creating()">
-              {{ creating() ? 'Creating…' : 'Create collection' }}
+              {{ creating() ? 'Creating…' : 'Start property workspace' }}
             </button>
           </div>
         </form>
@@ -162,6 +163,7 @@ type StateFilter = 'ALL' | CollectionState;
       .desk-actions { display:flex; flex-wrap:wrap; gap:.6rem; }
       .notice { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:1rem; margin-top:1rem; padding:.85rem 1rem; border:1px solid rgba(44,231,255,.28); border-radius:6px; background:rgba(44,231,255,.06); font-size:.78rem; }
       .notice span { color:var(--muted); }
+      .notice a { color:var(--accent); font-size:.72rem; white-space:nowrap; }
       .notice--locked,.notice--error { border-color:rgba(255,145,94,.35); background:rgba(255,145,94,.08); }
       .filter-bar { display:flex; align-items:center; gap:.25rem; margin:1.5rem 0 .75rem; border-bottom:1px solid var(--border); }
       .filter-bar button { padding:.65rem .85rem; border:0; border-bottom:2px solid transparent; background:none; color:var(--muted); font:500 .68rem var(--font-mono); text-transform:uppercase; cursor:pointer; }
@@ -180,8 +182,6 @@ type StateFilter = 'ALL' | CollectionState;
       .state[data-state='SEALED'],.state[data-state='PUBLISHED'] { color:var(--accent); }
       .empty-state { display:flex; flex-direction:column; align-items:center; gap:.35rem; padding:4rem 1rem; color:var(--muted); border:1px dashed var(--border); border-radius:6px; text-align:center; }
       .empty-state strong { color:var(--text); }
-      .desk-footer { display:flex; justify-content:space-between; gap:1rem; margin-top:1.5rem; color:var(--muted); font-size:.68rem; }
-      .desk-footer button { border:0; background:none; color:inherit; cursor:pointer; }
       .dialog-shell { position:fixed; inset:0; z-index:1000; display:grid; place-items:center; padding:1rem; }
       .dialog-backdrop { position:absolute; inset:0; border:0; background:rgba(0,0,0,.72); }
       .dialog { position:relative; width:min(32rem,100%); display:grid; gap:1rem; padding:1.5rem; border:1px solid var(--border); border-radius:8px; background:#061412; box-shadow:var(--shadow-soft); }
@@ -196,7 +196,6 @@ type StateFilter = 'ALL' | CollectionState;
 })
 export class CollectionsComponent {
   private readonly api = inject(CollectionApiService);
-  private readonly session = inject(AdminSessionService);
   private readonly router = inject(Router);
 
   readonly states: StateFilter[] = ['ALL', 'DRAFT', 'REVIEW', 'SEALED', 'PUBLISHED'];
@@ -208,7 +207,6 @@ export class CollectionsComponent {
   readonly createOpen = signal(false);
   readonly creating = signal(false);
   readonly createError = signal<string | null>(null);
-  readonly subject = this.session.subject;
   readonly filtered = computed(() => {
     const state = this.filter();
     return state === 'ALL'
@@ -305,10 +303,6 @@ export class CollectionsComponent {
 
   shortOwner(owner: string): string {
     return owner.length > 18 ? `${owner.slice(0, 10)}…${owner.slice(-6)}` : owner;
-  }
-
-  logout(): void {
-    this.session.logoutAndRedirect();
   }
 
 }

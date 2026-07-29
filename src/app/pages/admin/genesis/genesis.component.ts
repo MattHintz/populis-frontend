@@ -11,6 +11,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import {
   ActionApproval,
   AdminLaunchService,
@@ -74,7 +75,7 @@ interface LaunchStage {
 @Component({
   selector: 'solslot-admin-genesis',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AdminWorkspaceNavComponent],
   templateUrl: './genesis.component.html',
   styleUrl: './genesis.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -122,8 +123,8 @@ export class GenesisComponent implements OnInit, OnDestroy {
     { label: 'Confirmation', description: 'Confirm the chain result and sign the artifact.' },
     { label: 'Signed Archive', description: 'Lock and preserve the completed launch.' },
     {
-      label: 'Customer Payments',
-      description: 'Prove delivery and an exact refund before opening sales.',
+      label: 'Payment Check',
+      description: 'Test one delivery and one full refund before opening sales.',
     },
   ];
   readonly operationGateNames = ['minting', 'presale', 'purchases'] as const;
@@ -397,9 +398,11 @@ export class GenesisComponent implements OnInit, OnDestroy {
 
   gateHelp(name: Exclude<LaunchGateName, 'ceremonyBroadcast'>): string {
     return {
-      minting: 'Allows only reviewed collection proposals to enter the on-chain mint workflow.',
-      presale: 'Allows only approved refundable voucher reservations.',
-      purchases: 'Allows only zkPassport-approved vaults to receive system-priced purchase intents.',
+      minting: 'Publish approved SmartDeeds from a reviewed collection.',
+      presale:
+        'Accept new refundable reservations. Existing deliveries and refunds continue after closing.',
+      purchases:
+        'Accept new direct SmartDeed purchases for approved vaults. Existing settlement continues after closing.',
     }[name];
   }
 
@@ -906,7 +909,11 @@ export class GenesisComponent implements OnInit, OnDestroy {
       return await operation();
     } catch (error) {
       const detail = formatError(error);
-      if (/unknown error|http failure response.*:\s*0\b/i.test(detail)) {
+      if (
+        /unknown error|http failure during parsing|http failure response.*:\s*0\b/i.test(
+          detail,
+        )
+      ) {
         this.error.set(
           'The administrator service could not be reached. No action is available. Try again after the service is restored.',
         );

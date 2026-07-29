@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import { EvmWalletService } from '../../../services/evm-wallet.service';
 import {
   OmnichainOwnershipActivationService,
@@ -13,8 +12,9 @@ import { formatError } from '../../../utils/format-error';
 @Component({
   selector: 'pp-omnichain-ownership-activation',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, AdminWorkspaceNavComponent],
   template: `
+    <solslot-admin-workspace-nav />
     <main class="activation">
       <header class="page-header">
         <div>
@@ -23,7 +23,6 @@ import { formatError } from '../../../utils/format-error';
           <p>Approve and schedule the sealed Safe-to-timelock operation.</p>
         </div>
         <div class="header-actions">
-          <a routerLink="/admin/collections" class="btn btn--ghost">Collections</a>
           <button type="button" class="btn btn--ghost" (click)="reload()" [disabled]="loading()">
             Refresh
           </button>

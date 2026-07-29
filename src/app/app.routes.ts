@@ -183,7 +183,7 @@ export const routes: Routes = [
       import('./pages/admin/admin-authority/admin-authority.component').then(
         (m) => m.AdminAuthorityComponent,
       ),
-    title: 'Current Authority · Solslot',
+    title: 'Administrator Team · Solslot',
   },
   {
     path: 'admin/approvals',

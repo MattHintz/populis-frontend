@@ -174,6 +174,21 @@ describe('GenesisComponent', () => {
     expect(text).not.toContain(ceremonyId);
   });
 
+  it('does not expose transport errors when the launch service is unavailable', async () => {
+    launch.publicStatus.and.rejectWith(
+      new Error(
+        '200 OK — Http failure during parsing for https://example.test/protocol-api/admin/launch/public',
+      ),
+    );
+
+    await component.ngOnInit();
+
+    expect(component.error()).toBe(
+      'The administrator service could not be reached. No action is available. Try again after the service is restored.',
+    );
+    expect(component.error()).not.toContain('Http failure during parsing');
+  });
+
   it('resumes the active launch from the connected wallet and maps the role automatically', async () => {
     const current = workspace();
     launch.resumeChallenge.and.resolveTo({
@@ -362,7 +377,7 @@ describe('GenesisComponent', () => {
     component.workspace.set(beforeLaunch);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).not.toContain('Prove the payment path');
+    expect(fixture.nativeElement.textContent).not.toContain('Run the customer payment check');
 
     const launched = workspace('locked');
     launched.readiness.push({
@@ -376,7 +391,8 @@ describe('GenesisComponent', () => {
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toContain('Prove the payment path');
+    expect(text).toContain('Run the customer payment check');
+    expect(text).toContain('Use the same test SmartDeed twice');
     expect(text).toContain('Send a test payment');
     expect(text).toContain('Prove a full refund');
     expect(text).toContain('Unlock sales controls');

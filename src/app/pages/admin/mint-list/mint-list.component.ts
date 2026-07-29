@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import { MintProposalResponse } from '../../../services/admin-api.service';
 import { AdminSessionService } from '../../../services/admin-session.service';
 import { MintProposalApiService } from '../../../services/mint-proposal-api.service';
@@ -10,8 +11,9 @@ import { formatError } from '../../../utils/format-error';
 @Component({
   selector: 'pp-admin-mint-list',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, AdminWorkspaceNavComponent],
   template: `
+    <solslot-admin-workspace-nav />
     <section class="container-p py-12 md:py-16">
       <header class="flex flex-wrap items-end justify-between gap-6">
         <div>
@@ -24,7 +26,6 @@ import { formatError } from '../../../utils/format-error';
           </p>
         </div>
         <div class="flex flex-wrap gap-3">
-          <a routerLink="/admin" class="btn btn--ghost">&larr; Dashboard</a>
           <a routerLink="/admin/collections" class="btn btn--primary">Collection desk</a>
         </div>
       </header>
