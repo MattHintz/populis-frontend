@@ -228,6 +228,41 @@ describe('GenesisComponent', () => {
     expect(text).not.toContain('Schedule 24-hour handoff');
   });
 
+  it('explains the timelock wait without sending the administrator to a script', () => {
+    const rail: RailOwnershipResult = {
+      status: {
+        state: 'WAITING_FOR_DELAY',
+        phase: 'execute',
+        network: 'baseSepolia',
+        scheduledFor: 1_900_000_000,
+        approvals: [],
+        broadcastTransaction: null,
+        broadcast: null,
+        submission: null,
+      },
+      decisionReceipt: {
+        title: 'Accept ownership',
+        network: 'Base Sepolia',
+        financialEffect: 'Test-network gas only',
+        customerImpact: 'No customer funds move',
+        reversibility: 'Final after approval',
+        requiredApprovers: 'Owner plus one coadministrator',
+      },
+    };
+
+    component.workspace.set(workspace());
+    component.railOwnership.set(rail);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement.textContent as string).replace(/\s+/g, ' ');
+    expect(text).toContain('Safety delay in progress');
+    expect(text).toContain('No action is needed yet');
+    expect(text).toContain('Final acceptance');
+    expect(component.railActionLabel()).toBe('Check now');
+    expect(text).not.toContain('execute package');
+    expect(text).not.toContain('calldata');
+  });
+
   it('resumes the active launch from the connected wallet and maps the role automatically', async () => {
     const current = workspace();
     launch.resumeChallenge.and.resolveTo({
