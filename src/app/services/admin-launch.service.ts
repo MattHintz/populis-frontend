@@ -408,6 +408,8 @@ export interface RailOwnershipStatus {
   state:
     | 'AWAITING_APPROVALS'
     | 'READY_TO_BROADCAST'
+    | 'BROADCAST_PENDING'
+    | 'CONFIRMING'
     | 'SCHEDULED'
     | 'WAITING_FOR_SCHEDULE'
     | 'WAITING_FOR_DELAY'
@@ -422,6 +424,11 @@ export interface RailOwnershipStatus {
     transactionHash: string;
     confirmations: number;
     minimumConfirmations: number;
+  } | null;
+  submission?: {
+    transactionHash: string;
+    submittedBy: string;
+    submittedAt: number;
   } | null;
 }
 

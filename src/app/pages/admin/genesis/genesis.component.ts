@@ -152,6 +152,7 @@ export class GenesisComponent implements OnInit, OnDestroy {
 
   private progressTimer: ReturnType<typeof setInterval> | null = null;
   private rehearsalTimer: ReturnType<typeof setInterval> | null = null;
+  private railTimer: ReturnType<typeof setInterval> | null = null;
 
   async ngOnInit(): Promise<void> {
     this.consumeFragment();
@@ -168,6 +169,7 @@ export class GenesisComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.stopProgressPolling();
     this.stopRehearsalPolling();
+    this.stopRailPolling();
   }
 
   async claimOwner(kind: WalletKind): Promise<void> {
@@ -213,6 +215,7 @@ export class GenesisComponent implements OnInit, OnDestroy {
       this.workspace.set(null);
       this.stopProgressPolling();
       this.stopRehearsalPolling();
+      this.stopRailPolling();
       this.message.set('Signed out. The launch remains safely saved.');
     });
   }
@@ -437,6 +440,7 @@ export class GenesisComponent implements OnInit, OnDestroy {
             transactionHash,
           ),
         );
+        this.startRailPolling();
       } else if (decision.kind === 'rehearsal-payment') {
         const transaction = decision.rehearsal.status.walletTransaction;
         if (!transaction) throw new Error('The fixed rehearsal transaction is not ready.');
@@ -566,6 +570,18 @@ export class GenesisComponent implements OnInit, OnDestroy {
         return;
       }
       if (
+        rail.status.state === 'BROADCAST_PENDING' ||
+        rail.status.state === 'CONFIRMING'
+      ) {
+        this.startRailPolling();
+        this.message.set(
+          rail.status.state === 'BROADCAST_PENDING'
+            ? 'The reviewed Safe transaction was submitted. Solslot is tracking it automatically.'
+            : 'The ownership action is confirmed and is collecting the required block confirmations.',
+        );
+        return;
+      }
+      if (
         rail.status.state === 'SCHEDULED' ||
         rail.status.state === 'WAITING_FOR_DELAY' ||
         rail.status.state === 'WAITING_FOR_SCHEDULE'
@@ -611,6 +627,8 @@ export class GenesisComponent implements OnInit, OnDestroy {
     const labels: Record<string, string> = {
       AWAITING_APPROVALS: 'Awaiting approvals',
       READY_TO_BROADCAST: 'Ready to submit',
+      BROADCAST_PENDING: 'Submitted to Base Sepolia',
+      CONFIRMING: 'Confirming on Base Sepolia',
       SCHEDULED: '24-hour delay active',
       WAITING_FOR_SCHEDULE: 'Waiting for schedule',
       WAITING_FOR_DELAY: '24-hour delay active',
@@ -758,9 +776,19 @@ export class GenesisComponent implements OnInit, OnDestroy {
     const workspace = await this.launch.workspace();
     this.workspace.set(workspace);
     try {
-      this.railOwnership.set(await this.launch.railOwnership());
+      const rail = await this.launch.railOwnership();
+      this.railOwnership.set(rail);
+      if (
+        ['BROADCAST_PENDING', 'CONFIRMING', 'SCHEDULED', 'WAITING_FOR_SCHEDULE', 'WAITING_FOR_DELAY']
+          .includes(rail.status.state)
+      ) {
+        this.startRailPolling();
+      } else {
+        this.stopRailPolling();
+      }
     } catch {
       this.railOwnership.set(null);
+      this.stopRailPolling();
     }
     try {
       const rehearsal = await this.launch.settlementRehearsal();
@@ -813,6 +841,37 @@ export class GenesisComponent implements OnInit, OnDestroy {
     if (!this.rehearsalTimer) return;
     clearInterval(this.rehearsalTimer);
     this.rehearsalTimer = null;
+  }
+
+  private startRailPolling(): void {
+    if (this.railTimer) return;
+    this.railTimer = setInterval(() => {
+      if (!this.pending()) void this.pollRailOwnership();
+    }, 15_000);
+  }
+
+  private stopRailPolling(): void {
+    if (!this.railTimer) return;
+    clearInterval(this.railTimer);
+    this.railTimer = null;
+  }
+
+  private async pollRailOwnership(): Promise<void> {
+    const result = await this.perform('poll-rail', () => this.launch.railOwnership());
+    if (!result) return;
+    this.railOwnership.set(result);
+    if (
+      ['AWAITING_APPROVALS', 'READY_TO_BROADCAST', 'READY_TO_EXECUTE', 'DONE']
+        .includes(result.status.state)
+    ) {
+      this.stopRailPolling();
+      if (result.status.state === 'DONE') {
+        this.message.set('Base Sepolia ownership is active and fully confirmed.');
+        await this.reloadWorkspace();
+      } else if (result.status.state === 'READY_TO_EXECUTE') {
+        this.message.set('The 24-hour safety delay is complete. Fresh approvals are ready.');
+      }
+    }
   }
 
   private async pollSettlementRehearsal(): Promise<void> {

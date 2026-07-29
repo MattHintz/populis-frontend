@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import {
   AdminLaunchService,
   LaunchWorkspace,
+  RailOwnershipResult,
 } from '../../../services/admin-launch.service';
 import { EvmWalletService } from '../../../services/evm-wallet.service';
 import { GenesisComponent } from './genesis.component';
@@ -187,6 +188,44 @@ describe('GenesisComponent', () => {
       'The administrator service could not be reached. No action is available. Try again after the service is restored.',
     );
     expect(component.error()).not.toContain('Http failure during parsing');
+  });
+
+  it('shows a resumable confirmation state without asking for another broadcast', () => {
+    const transactionHash = `0x${'44'.repeat(32)}`;
+    const rail: RailOwnershipResult = {
+      status: {
+        state: 'BROADCAST_PENDING',
+        phase: 'schedule',
+        network: 'baseSepolia',
+        scheduledFor: null,
+        approvals: [],
+        broadcastTransaction: null,
+        broadcast: null,
+        submission: {
+          transactionHash,
+          submittedBy: walletAddress,
+          submittedAt: 1_800_000_002,
+        },
+      },
+      decisionReceipt: {
+        title: 'Schedule ownership',
+        network: 'Base Sepolia',
+        financialEffect: 'Test-network gas only',
+        customerImpact: 'No customer funds move',
+        reversibility: 'Timelock delay applies',
+        requiredApprovers: 'Owner plus one coadministrator',
+      },
+    };
+
+    component.workspace.set(workspace());
+    component.railOwnership.set(rail);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement.textContent as string).replace(/\s+/g, ' ');
+    expect(component.railStateLabel()).toBe('Submitted to Base Sepolia');
+    expect(text).toContain('You do not need to submit it again');
+    expect(text).toContain(transactionHash);
+    expect(text).not.toContain('Schedule 24-hour handoff');
   });
 
   it('resumes the active launch from the connected wallet and maps the role automatically', async () => {

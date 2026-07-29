@@ -343,6 +343,16 @@
                 </dd>
               </div>
             </dl>
+            @if (rail.status.submission; as submission) {
+              <div class="operation-callout">
+                <strong>Submitted to Base Sepolia</strong>
+                <span>
+                  Solslot saved this exact transaction and will keep checking it automatically.
+                  You do not need to submit it again.
+                </span>
+                <small class="mono">{{ submission.transactionHash }}</small>
+              </div>
+            }
           }
           <div class="inline-actions">
             <button
@@ -804,7 +814,15 @@
             </div>
           }
         </dl>
-        @if (decision.kind === 'rehearsal-payment') {
+        @if (decision.kind === 'rail-broadcast') {
+          <div class="wallet-review">
+            <strong>What your wallet will show</strong>
+            <span>
+              A Base Sepolia transaction to the reviewed Root Safe. It moves no protocol or
+              customer funds; the submitting wallet pays only test-network gas.
+            </span>
+          </div>
+        } @else if (decision.kind === 'rehearsal-payment') {
           <div class="wallet-review">
             <strong>Before you approve</strong>
             <span>
@@ -829,6 +847,8 @@
             {{
               decision.kind === 'broadcast'
                 ? 'Launch Testnet protocol'
+                : decision.kind === 'rail-broadcast'
+                  ? 'Submit reviewed Safe action'
                 : decision.kind === 'rehearsal-payment'
                   ? rehearsalActionLabel(decision.rehearsal)
                   : 'Approve exact action'

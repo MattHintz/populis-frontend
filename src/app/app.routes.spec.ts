@@ -5,10 +5,10 @@ describe('admin portal route boundary', () => {
     expect(routes.some((route) => route.path === 'admin/genesis')).toBeTrue();
   });
 
-  it('keeps the standalone Safe evidence page behind administrator auth', () => {
+  it('consolidates the old Safe page into the guided launch workspace', () => {
     const route = routes.find((candidate) => candidate.path === 'admin/omnichain-activation');
     expect(route).toBeDefined();
-    expect(route?.canActivate).toBeDefined();
+    expect(route?.redirectTo).toBe('admin/genesis');
   });
 
   it('routes the admin home to the consolidated operations dashboard', () => {

@@ -451,6 +451,8 @@ export class OmnichainOwnershipActivationComponent {
     switch (state) {
       case 'AWAITING_APPROVALS': return 'Awaiting approvals';
       case 'READY_TO_BROADCAST': return 'Ready to schedule';
+      case 'BROADCAST_PENDING': return 'Submitted to Base Sepolia';
+      case 'CONFIRMING': return 'Confirming on Base Sepolia';
       case 'SCHEDULED': return '24-hour delay active';
       case 'READY_TO_EXECUTE': return 'Ready to accept ownership';
       case 'DONE': return 'Ownership activated';

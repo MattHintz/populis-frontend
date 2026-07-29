@@ -93,12 +93,8 @@ export const routes: Routes = [
   },
   {
     path: 'admin/omnichain-activation',
-    canActivate: [adminAuthGuard],
-    loadComponent: () =>
-      import(
-        './pages/admin/omnichain-ownership-activation/omnichain-ownership-activation.component'
-      ).then((m) => m.OmnichainOwnershipActivationComponent),
-    title: 'Base Sepolia Ownership · Solslot',
+    redirectTo: 'admin/genesis',
+    pathMatch: 'full',
   },
   {
     path: 'admin/sales',
