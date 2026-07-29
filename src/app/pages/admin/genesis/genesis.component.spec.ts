@@ -379,8 +379,10 @@ describe('GenesisComponent', () => {
     expect(component.fundingPreparation()?.summary.customizationAllowed).toBeFalse();
     expect(component.fundingPreparation()?.summary.bridgeBatchMojos).toBe(530);
     expect(component.fundingReceipt()?.plan.outputs.length).toBe(9);
-    expect(fixture.nativeElement.textContent).toContain('1,000,558 mojos');
-    expect(fixture.nativeElement.textContent).toContain('cannot be edited');
+    expect(fixture.nativeElement.textContent).toContain('Less than 0.000002 XCH');
+    expect(fixture.nativeElement.textContent).toContain('cannot be changed');
+    expect(fixture.nativeElement.textContent).toContain('Exact mojos');
+    expect(fixture.nativeElement.textContent).toContain('530');
   });
 
   it('keeps final broadcast behind an approved, open ceremony-only window', async () => {
@@ -437,6 +439,34 @@ describe('GenesisComponent', () => {
     expect(component.decisionReceipt()?.customerImpact).toContain(
       'only the approved genesis bundle',
     );
+  });
+
+  it('summarizes readiness and keeps protected setup out of the owner workflow', async () => {
+    const current = workspace();
+    current.nextTask = {
+      title: 'Finish the fixed launch coordinates',
+      body: 'The protected mint signer is not installed yet.',
+      assignedRole: 'technical-coadmin',
+      action: 'replacePlanEvidence',
+    };
+    current.readiness[1].status = 'Blocked';
+    launch.workspace.and.resolveTo(current);
+    component.workspace.set(current);
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('1 of 2 ready');
+    expect(text).toContain('1 item still needs attention');
+    expect(text).toContain('Check setup again');
+    expect(text).toContain('No administrator should paste keys');
+    expect(text).toContain('Setup needed');
+    expect(text).not.toContain('Complete the fixed launch coordinates');
+
+    await component.runPrimaryAction();
+
+    expect(launch.workspace).toHaveBeenCalled();
+    expect(launch.buildPlan).not.toHaveBeenCalled();
+    expect(component.message()).toBe('Solslot checked the launch services again.');
   });
 
   it('moves the customer payment check after the signed launch archive', () => {
