@@ -59,7 +59,7 @@ export const routes: Routes = [
       import('./pages/admin/genesis/genesis.component').then(
         (m) => m.GenesisComponent,
       ),
-    title: 'Genesis Launch · Solslot',
+    title: 'Alpha Protocol Launch · Solslot',
   },
   {
     path: 'admin',
@@ -80,7 +80,7 @@ export const routes: Routes = [
       import('./pages/admin/collections/collections.component').then(
         (m) => m.CollectionsComponent,
       ),
-    title: 'Collection Minting · Solslot',
+    title: 'Properties · Solslot',
   },
   {
     path: 'admin/collections/:id',
@@ -125,7 +125,7 @@ export const routes: Routes = [
       import('./pages/admin/mint-list/mint-list.component').then(
         (m) => m.MintListComponent,
       ),
-    title: 'Mint Proposals · Solslot',
+    title: 'SmartDeed Proposals · Solslot',
   },
   {
     path: 'admin/mint/new',
@@ -174,7 +174,7 @@ export const routes: Routes = [
       import('./pages/admin/mint-detail/mint-detail.component').then(
         (m) => m.MintDetailComponent,
       ),
-    title: 'Mint Proposal · Solslot',
+    title: 'SmartDeed Proposal · Solslot',
   },
   {
     path: 'admin/authority',
@@ -192,7 +192,7 @@ export const routes: Routes = [
       import('./pages/admin/approvals/admin-approvals.component').then(
         (m) => m.AdminApprovalsComponent,
       ),
-    title: 'Admin Approvals · Solslot',
+    title: 'Approval Inbox · Solslot',
   },
   {
     // Public: no guard.  Per POP-CANON-013 the committee endpoints are

@@ -18,11 +18,11 @@ import { formatError } from '../../../utils/format-error';
       <header class="flex flex-wrap items-end justify-between gap-6">
         <div>
           <div class="mono text-[0.7rem] uppercase tracking-[0.25em] text-brand mb-2">
-            Solslot · Admin Desk
+            Governed issuance
           </div>
-          <h1 class="font-display text-4xl md:text-5xl">Mint proposals</h1>
+          <h1 class="font-display text-4xl md:text-5xl">SmartDeed proposals</h1>
           <p class="mt-3 max-w-3xl text-sm leading-relaxed text-text-muted">
-            Governed SmartDeed issuance proposals. Click a row to review, publish, or execute.
+            Follow each approved property from owner submission through governance and confirmation.
           </p>
         </div>
         <div class="flex flex-wrap gap-3">
@@ -43,13 +43,14 @@ import { formatError } from '../../../utils/format-error';
 
       @if (!loading() && !error() && proposals().length === 0) {
         <div class="mt-10 empty-state">
-          <strong>No mint proposals yet</strong>
-          <span>Create a draft to start the governed issuance process.</span>
+          <strong>No SmartDeed proposals yet</strong>
+          <span>Prepare and seal a property collection before opening its governance proposals.</span>
+          <a routerLink="/admin/collections" class="btn btn--primary mt-3">Open collections</a>
         </div>
       }
 
       @if (proposals().length > 0) {
-        <div class="mt-8 collection-table" role="table" aria-label="Mint proposals">
+        <div class="mt-8 collection-table" role="table" aria-label="SmartDeed proposals">
           <div class="table-head" role="row">
             <span>Property / Collection</span>
             <span>State</span>
