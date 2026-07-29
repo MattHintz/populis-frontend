@@ -112,16 +112,19 @@ export class GenesisComponent implements OnInit, OnDestroy {
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago';
 
   readonly stages: LaunchStage[] = [
-    { label: 'Release Check', description: 'Confirm the exact reviewed RC21 release.' },
+    { label: 'Release Check', description: 'Confirm the exact reviewed release.' },
     { label: 'Administrator Enrollment', description: 'Enroll the owner and two coadmins.' },
     { label: 'Rail Ownership', description: 'Complete the Safe and timelock handoff.' },
-    { label: 'Settlement Rehearsal', description: 'Prove payment, delivery, and refund paths.' },
     { label: 'Ceremony Funding', description: 'Create the nine fixed Testnet11 inputs.' },
     { label: 'Plan Review', description: 'Build the plan from signed release evidence.' },
     { label: 'Administrator Approval', description: 'Owner plus one approve the exact plan.' },
     { label: 'Final Launch', description: 'Owner broadcasts during a short approved window.' },
     { label: 'Confirmation', description: 'Confirm the chain result and sign the artifact.' },
     { label: 'Signed Archive', description: 'Lock and preserve the completed launch.' },
+    {
+      label: 'Customer Payments',
+      description: 'Prove delivery and an exact refund before opening sales.',
+    },
   ];
   readonly operationGateNames = ['minting', 'presale', 'purchases'] as const;
 
@@ -141,6 +144,10 @@ export class GenesisComponent implements OnInit, OnDestroy {
   });
   readonly ownerSession = computed(() => this.workspace()?.session.role === 'owner');
   readonly coadminSession = computed(() => this.workspace()?.session.role === 'coadmin');
+  readonly launchSealed = computed(() => this.workspace()?.launch.state === 'locked');
+  readonly customerPaymentsReady = computed(
+    () => this.finding('settlement')?.status === 'Healthy',
+  );
   readonly primaryActionLabel = computed(() => this.nextActionLabel());
 
   private progressTimer: ReturnType<typeof setInterval> | null = null;
@@ -611,6 +618,28 @@ export class GenesisComponent implements OnInit, OnDestroy {
     return state ? (labels[state] ?? state) : (this.finding('railOwnership')?.status ?? 'Waiting');
   }
 
+  rehearsalCompleted(step: number): boolean {
+    return (this.settlementRehearsal()?.status.completedSteps ?? 0) >= step;
+  }
+
+  rehearsalActionLabel(rehearsal = this.settlementRehearsal()): string {
+    const status = rehearsal?.status;
+    if (!status || status.state === 'NOT_STARTED') return 'Start payment check';
+    if (status.state === 'FAILED') return 'Retry payment check';
+    if (status.state === 'SUCCEEDED') return 'Payment path ready';
+    const labels: Record<string, string> = {
+      PREPARE: 'Prepare payment check',
+      APPROVE_DELIVERY: 'Approve delivery-test USDC',
+      PAY_DELIVERY: 'Send delivery test',
+      VERIFY_DELIVERY: 'Check deed delivery',
+      APPROVE_REFUND: 'Approve refund-test USDC',
+      PAY_REFUND: 'Send refund test',
+      VERIFY_REFUND: 'Check exact refund',
+      COMPLETE: 'Payment path ready',
+    };
+    return labels[status.phase] ?? 'Check progress';
+  }
+
   async advanceSettlementRehearsal(): Promise<void> {
     await this.perform('settlement-rehearsal', async () => {
       let rehearsal = await this.launch.settlementRehearsal();
@@ -641,7 +670,7 @@ export class GenesisComponent implements OnInit, OnDestroy {
       ) {
         this.startRehearsalPolling();
         this.message.set(
-          rehearsal.status.message || 'The validator rehearsal is running. This page will update.',
+          rehearsal.status.message || 'The payment check is running. This page will update.',
         );
       }
     });
@@ -790,6 +819,11 @@ export class GenesisComponent implements OnInit, OnDestroy {
     );
     if (!result) return;
     this.settlementRehearsal.set(result);
+    if (result.status.walletTransaction) {
+      this.stopRehearsalPolling();
+      this.message.set('The next test-wallet step is ready for review.');
+      return;
+    }
     if (result.status.state === 'SUCCEEDED' || result.status.state === 'FAILED') {
       this.stopRehearsalPolling();
       await this.reloadWorkspace();
@@ -802,14 +836,15 @@ export class GenesisComponent implements OnInit, OnDestroy {
     if (this.finding('release')?.status !== 'Healthy') return 0;
     if (this.enrolledCount() < 3) return 1;
     if (this.finding('railOwnership')?.status !== 'Healthy') return 2;
-    if (this.finding('settlement')?.status !== 'Healthy') return 3;
-    if (this.finding('funding')?.status !== 'Healthy') return 4;
+    if (this.finding('funding')?.status !== 'Healthy') return 3;
     const state = workspace.launch.state;
-    if (state === 'roster_open' || state === 'roster_frozen') return 5;
-    if (state === 'planned') return 6;
-    if (state === 'plan_approved') return 7;
-    if (['broadcast', 'confirmed', 'artifact_pending', 'artifact_signed'].includes(state)) return 8;
-    return 9;
+    if (state === 'roster_open' || state === 'roster_frozen') return 4;
+    if (state === 'planned') return 5;
+    if (state === 'plan_approved') return 6;
+    if (state === 'broadcast') return 7;
+    if (['confirmed', 'artifact_pending', 'artifact_signed'].includes(state)) return 8;
+    if (state === 'locked' && !this.customerPaymentsReady()) return 9;
+    return 10;
   }
 
   private nextActionLabel(): string {
@@ -817,7 +852,7 @@ export class GenesisComponent implements OnInit, OnDestroy {
     const labels: Record<string, string> = {
       enrollment: 'Review administrator team',
       railOwnership: 'Continue rail ownership',
-      settlementRehearsal: 'Run settlement rehearsal',
+      settlementRehearsal: 'Run customer payment check',
       funding: 'Continue ceremony funding',
       freezeRoster: 'Confirm administrator team',
       buildPlan: 'Build launch plan',

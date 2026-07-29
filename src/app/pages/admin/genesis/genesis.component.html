@@ -355,92 +355,6 @@
           </div>
         </section>
 
-        <section id="settlement-rehearsal" class="workspace-section">
-          <div class="section-heading">
-            <div>
-              <span class="eyebrow">Delivery proof</span>
-              <h2>Settlement rehearsal</h2>
-            </div>
-            <span
-              [class]="
-                settlementRehearsal()?.status?.state === 'SUCCEEDED'
-                  ? 'status status--healthy'
-                  : settlementRehearsal()?.status?.state === 'FAILED'
-                    ? 'status status--blocked'
-                    : 'status status--waiting'
-              "
-            >
-              {{
-                settlementRehearsal()?.status?.state === 'SUCCEEDED'
-                  ? 'Passed'
-                  : settlementRehearsal()?.status?.state === 'FAILED'
-                    ? 'Needs attention'
-                    : 'Waiting'
-              }}
-            </span>
-          </div>
-          <p>{{ finding('settlement')?.impact }}</p>
-          <div class="operation-callout">
-            <strong>
-              {{
-                settlementRehearsal()?.status?.step ||
-                  'Ready for a technical coadministrator'
-              }}
-            </strong>
-            <span>
-              {{
-                settlementRehearsal()?.status?.message ||
-                  'The test must prove payment, validator quorum, SmartDeed delivery, and an exact refund.'
-              }}
-            </span>
-          </div>
-          <dl class="plain-summary plain-summary--three">
-            <div>
-              <dt>Payment</dt>
-              <dd>Base Sepolia faucet USDC</dd>
-            </div>
-            <div>
-              <dt>Approval</dt>
-              <dd>zkPassport-approved test vault</dd>
-            </div>
-            <div>
-              <dt>Required result</dt>
-              <dd>Delivery and exact refund</dd>
-            </div>
-          </dl>
-          <div class="inline-actions">
-            <button
-              type="button"
-              class="btn btn--ghost"
-              [disabled]="
-                !!pending() ||
-                !coadminSession() ||
-                settlementRehearsal()?.status?.state === 'SUCCEEDED'
-              "
-              (click)="advanceSettlementRehearsal()"
-            >
-              {{
-                settlementRehearsal()?.status?.walletTransaction
-                  ? 'Review test purchase'
-                  : settlementRehearsal()?.status?.state === 'FAILED'
-                    ? 'Retry fixed rehearsal'
-                    : settlementRehearsal()?.status?.state === 'NOT_STARTED'
-                      ? 'Start fixed rehearsal'
-                      : 'Refresh rehearsal'
-              }}
-            </button>
-            @if (!coadminSession()) {
-              <small>Assigned to either enrolled coadministrator.</small>
-            }
-          </div>
-          @if (settlementRehearsal()?.status?.evidenceDigest) {
-            <details>
-              <summary>Verified rehearsal evidence</summary>
-              <p class="mono">{{ settlementRehearsal()?.status?.evidenceDigest }}</p>
-            </details>
-          }
-        </section>
-
         <section class="workspace-section" aria-labelledby="funding-title">
           <div class="section-heading">
             <div>
@@ -560,6 +474,103 @@
         }
 
         @if (workspace()!.launch.state === 'locked') {
+          <section id="settlement-rehearsal" class="workspace-section">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">Required before customer sales</span>
+                <h2>Prove the payment path</h2>
+              </div>
+              <span
+                [class]="
+                  settlementRehearsal()?.status?.state === 'SUCCEEDED'
+                    ? 'status status--healthy'
+                    : settlementRehearsal()?.status?.state === 'FAILED'
+                      ? 'status status--blocked'
+                      : 'status status--waiting'
+                "
+              >
+                {{
+                  settlementRehearsal()?.status?.state === 'SUCCEEDED'
+                    ? 'Ready'
+                    : settlementRehearsal()?.status?.state === 'FAILED'
+                      ? 'Needs attention'
+                      : 'Not complete'
+                }}
+              </span>
+            </div>
+            <p>
+              Use test USDC to prove both outcomes before any presale or purchase window can open.
+              This check cannot move real funds.
+            </p>
+            <ol class="payment-checklist" aria-label="Customer payment activation steps">
+              <li [class.is-complete]="rehearsalCompleted(1)">
+                <span>1</span>
+                <div>
+                  <strong>Test delivery</strong>
+                  <small>Send faucet USDC to the exact canary deed and approved test vault.</small>
+                </div>
+              </li>
+              <li [class.is-complete]="rehearsalCompleted(2)">
+                <span>2</span>
+                <div>
+                  <strong>Confirm the deed</strong>
+                  <small>Wait while the validators confirm delivery to the selected vault.</small>
+                </div>
+              </li>
+              <li [class.is-complete]="rehearsalCompleted(3)">
+                <span>3</span>
+                <div>
+                  <strong>Test a refund</strong>
+                  <small>Run the second fixed payment and prove the full amount returns.</small>
+                </div>
+              </li>
+              <li [class.is-complete]="rehearsalCompleted(4)">
+                <span>4</span>
+                <div>
+                  <strong>Ready for customers</strong>
+                  <small>Signed evidence unlocks presale and purchase window approvals.</small>
+                </div>
+              </li>
+            </ol>
+            <div class="operation-callout">
+              <strong>
+                {{
+                  settlementRehearsal()?.status?.step ||
+                    'Ready for a coadministrator'
+                }}
+              </strong>
+              <span>
+                {{
+                  settlementRehearsal()?.status?.message ||
+                    'The page will follow delivery and refund confirmations automatically.'
+                }}
+              </span>
+            </div>
+            <div class="inline-actions">
+              <button
+                type="button"
+                class="btn btn--primary"
+                [disabled]="
+                  !!pending() ||
+                  !coadminSession() ||
+                  settlementRehearsal()?.status?.state === 'SUCCEEDED'
+                "
+                (click)="advanceSettlementRehearsal()"
+              >
+                {{ rehearsalActionLabel() }}
+              </button>
+              @if (!coadminSession()) {
+                <small>Either enrolled coadministrator can run this check.</small>
+              }
+            </div>
+            @if (settlementRehearsal()?.status?.evidenceDigest) {
+              <details>
+                <summary>Technical evidence</summary>
+                <p class="mono">{{ settlementRehearsal()?.status?.evidenceDigest }}</p>
+              </details>
+            }
+          </section>
+
           <section class="workspace-section" aria-labelledby="operation-windows-title">
             <div class="section-heading">
               <div>
@@ -600,7 +611,11 @@
                       <button
                         type="button"
                         class="btn btn--ghost"
-                        [disabled]="!!pending() || gateOpen(name)"
+                        [disabled]="
+                          !!pending() ||
+                          gateOpen(name) ||
+                          (name !== 'minting' && !customerPaymentsReady())
+                        "
                         (click)="reviewOperationWindow(name)"
                       >
                         Review window
@@ -614,11 +629,17 @@
                       <button
                         type="button"
                         class="btn btn--primary"
-                        [disabled]="!!pending()"
+                        [disabled]="
+                          !!pending() ||
+                          (name !== 'minting' && !customerPaymentsReady())
+                        "
                         (click)="activateOperationWindow(name)"
                       >
                         Open approved window
                       </button>
+                    }
+                    @if (name !== 'minting' && !customerPaymentsReady()) {
+                      <small>Complete the payment check first.</small>
                     }
                   </div>
                 </article>
@@ -757,7 +778,7 @@
               decision.kind === 'broadcast'
                 ? 'Launch Testnet protocol'
                 : decision.kind === 'rehearsal-payment'
-                  ? 'Submit test purchase'
+                  ? rehearsalActionLabel(decision.rehearsal)
                   : 'Approve exact action'
             }}
           </button>
