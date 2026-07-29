@@ -116,13 +116,17 @@
     </section>
   } @else {
     <header class="launch-header">
-      <div>
-        <span class="eyebrow">Solslot Testnet Alpha</span>
-        <h1>Alpha Protocol Launch</h1>
-        <p>
-          Signed in as {{ displayRole(workspace()!.session.role) }}, Administrator
-          {{ workspace()!.session.slot }}
-        </p>
+          <div>
+            <span class="eyebrow">Solslot Testnet Alpha</span>
+            <h1>Alpha Protocol Launch</h1>
+            <p>
+              Signed in as {{ displayRole(workspace()!.session.role) }}, Administrator
+              {{ workspace()!.session.slot }}
+            </p>
+            <span class="stage-progress">
+              Step {{ currentStageIndex() + 1 }} of {{ stages.length }}:
+              {{ stages[currentStageIndex()].label }}
+            </span>
       </div>
       <div class="launch-header__actions">
         <span class="wallet-label">{{ connectedWalletLabel() }}</span>
@@ -157,6 +161,7 @@
             <span class="assignment">
               Assigned to {{ displayRole(workspace()!.nextTask.assignedRole) }}
             </span>
+            <small class="next-action__note">{{ nextTaskNote() }}</small>
           </div>
           <button
             type="button"
@@ -171,8 +176,8 @@
         <section class="workspace-section" aria-labelledby="readiness-title">
           <div class="section-heading">
             <div>
-              <span class="eyebrow">Continuous checks</span>
-              <h2 id="readiness-title">Launch readiness</h2>
+              <span class="eyebrow">Automatic safety checks</span>
+              <h2 id="readiness-title">What is ready</h2>
             </div>
             <button
               type="button"
@@ -184,24 +189,73 @@
               <span class="sr-only">Refresh readiness</span>
             </button>
           </div>
-          <div class="readiness-list">
-            @for (item of workspace()!.readiness; track item.id) {
-              <article class="readiness-row">
-                <span [class]="statusClass(item.status)">{{ item.status }}</span>
-                <div>
-                  <strong>{{ item.title }}</strong>
-                  <p>{{ item.impact }}</p>
-                  <small>Assigned to {{ displayRole(item.assignedRole) }}</small>
-                  @if (item.evidence) {
-                    <details>
-                      <summary>Technical evidence</summary>
-                      <pre>{{ item.evidence | json }}</pre>
-                    </details>
-                  }
-                </div>
-              </article>
-            }
+          <div class="readiness-overview">
+            <div>
+              <strong>{{ readyFindings().length }} of {{ workspace()!.readiness.length }} ready</strong>
+              <span>
+                {{
+                  attentionFindings().length
+                    ? attentionFindings().length +
+                      ' item' +
+                      (attentionFindings().length === 1
+                        ? ' still needs attention'
+                        : 's still need attention')
+                    : 'Every launch check is ready'
+                }}
+              </span>
+            </div>
+            <div
+              class="readiness-progress"
+              role="progressbar"
+              aria-label="Launch checks ready"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              [attr.aria-valuenow]="readinessPercent()"
+            >
+              <span [style.width.%]="readinessPercent()"></span>
+            </div>
           </div>
+
+          @if (attentionFindings().length) {
+            <div class="readiness-list" aria-label="Launch items needing attention">
+              @for (item of attentionFindings(); track item.id) {
+                <article class="readiness-row">
+                  <span [class]="statusClass(item.status)">{{ statusLabel(item.status) }}</span>
+                  <div>
+                    <strong>{{ item.title }}</strong>
+                    <p>{{ item.impact }}</p>
+                    <small>Assigned to {{ displayRole(item.assignedRole) }}</small>
+                    @if (item.evidence) {
+                      <details>
+                        <summary>Technical evidence</summary>
+                        <pre>{{ item.evidence | json }}</pre>
+                      </details>
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+          } @else {
+            <div class="readiness-complete">
+              <strong>All checks passed</strong>
+              <span>The wizard will keep checking as the launch moves forward.</span>
+            </div>
+          }
+
+          @if (readyFindings().length) {
+            <details class="ready-checks">
+              <summary>{{ readyFindings().length }} completed checks</summary>
+              @for (item of readyFindings(); track item.id) {
+                <div class="ready-check">
+                  <span aria-hidden="true">&#10003;</span>
+                  <div>
+                    <strong>{{ item.title }}</strong>
+                    <small>{{ item.impact }}</small>
+                  </div>
+                </div>
+              }
+            </details>
+          }
         </section>
 
         <section
@@ -360,18 +414,18 @@
               <h2 id="funding-title">Ceremony funding</h2>
             </div>
             <span [class]="statusClass(finding('funding')?.status || 'Waiting')">
-              {{ finding('funding')?.status || 'Waiting' }}
+              {{ statusLabel(finding('funding')?.status || 'Waiting') }}
             </span>
           </div>
           <p>
-            Solslot creates nine predetermined ceremony inputs from the configured faucet. Amounts,
-            destinations, and the zero fee cannot be edited.
+            Solslot creates the nine fixed test inputs required for launch. Their amounts and
+            destinations cannot be changed.
           </p>
           @if (fundingReceipt(); as receipt) {
             <dl class="plain-summary">
               <div>
                 <dt>Total test funds</dt>
-                <dd>1,000,558 mojos</dd>
+                <dd>Less than 0.000002 XCH</dd>
               </div>
               <div>
                 <dt>Network fee</dt>
@@ -387,12 +441,12 @@
               </div>
             </dl>
             <details>
-              <summary>View the nine fixed output amounts</summary>
+              <summary>Technical breakdown of the nine fixed outputs</summary>
               <table>
                 <thead>
                   <tr>
                     <th>Purpose</th>
-                    <th>Test mojos</th>
+                    <th>Exact mojos</th>
                   </tr>
                 </thead>
                 <tbody>

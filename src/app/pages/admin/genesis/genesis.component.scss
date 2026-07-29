@@ -107,6 +107,13 @@ label {
   font-size: 0.8rem;
 }
 
+.stage-progress {
+  display: inline-block;
+  margin-top: 0.7rem;
+  color: var(--accent-3);
+  font: 700 0.68rem/1.3 var(--font-mono);
+}
+
 .launch-header__actions {
   display: flex;
   align-items: center;
@@ -293,6 +300,15 @@ label {
   text-transform: uppercase;
 }
 
+.next-action__note {
+  display: block;
+  max-width: 64ch;
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
 .workspace-section {
   padding: clamp(1.1rem, 3vw, 1.7rem);
 }
@@ -321,6 +337,85 @@ label {
 .administrator-list,
 .archive-list {
   border-top: 1px solid var(--border);
+}
+
+.readiness-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 0.6fr);
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  background: rgba(2, 20, 19, 0.42);
+}
+
+.readiness-overview > div:first-child {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.readiness-overview strong {
+  font-size: 0.9rem;
+}
+
+.readiness-overview span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.readiness-progress {
+  height: 0.45rem;
+  overflow: hidden;
+  background: rgba(234, 255, 247, 0.1);
+}
+
+.readiness-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent-3));
+  transition: width 180ms ease;
+}
+
+.readiness-complete {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.readiness-complete span,
+.ready-check small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.ready-checks {
+  margin-top: 1rem;
+}
+
+.ready-checks summary {
+  color: var(--muted);
+}
+
+.ready-check {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  gap: 0.6rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ready-check > span {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.ready-check div {
+  display: grid;
+  gap: 0.2rem;
 }
 
 .readiness-row,
@@ -774,6 +869,10 @@ td:last-child {
   }
 
   .readiness-row {
+    grid-template-columns: 1fr;
+  }
+
+  .readiness-overview {
     grid-template-columns: 1fr;
   }
 

@@ -113,15 +113,15 @@ export class GenesisComponent implements OnInit, OnDestroy {
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago';
 
   readonly stages: LaunchStage[] = [
-    { label: 'Release Check', description: 'Confirm the exact reviewed release.' },
-    { label: 'Administrator Enrollment', description: 'Enroll the owner and two coadmins.' },
-    { label: 'Rail Ownership', description: 'Complete the Safe and timelock handoff.' },
-    { label: 'Ceremony Funding', description: 'Create the nine fixed Testnet11 inputs.' },
-    { label: 'Plan Review', description: 'Build the plan from signed release evidence.' },
-    { label: 'Administrator Approval', description: 'Owner plus one approve the exact plan.' },
-    { label: 'Final Launch', description: 'Owner broadcasts during a short approved window.' },
-    { label: 'Confirmation', description: 'Confirm the chain result and sign the artifact.' },
-    { label: 'Signed Archive', description: 'Lock and preserve the completed launch.' },
+    { label: 'Release Check', description: 'Confirm the reviewed Solslot release.' },
+    { label: 'Administrator Team', description: 'Enroll the owner and two coadministrators.' },
+    { label: 'Payment Rail', description: 'Put the test payment rail under team control.' },
+    { label: 'Test Funding', description: 'Create the nine fixed Testnet11 inputs.' },
+    { label: 'Plan Review', description: 'See exactly what the launch will create.' },
+    { label: 'Team Approval', description: 'Owner plus one approve the exact plan.' },
+    { label: 'Final Launch', description: 'Owner launches during a short approved window.' },
+    { label: 'Confirmation', description: 'Confirm the chain result and approve the record.' },
+    { label: 'Signed Archive', description: 'Preserve the completed launch as read-only.' },
     {
       label: 'Payment Check',
       description: 'Test one delivery and one full refund before opening sales.',
@@ -148,6 +148,16 @@ export class GenesisComponent implements OnInit, OnDestroy {
   readonly customerPaymentsReady = computed(
     () => this.finding('settlement')?.status === 'Healthy',
   );
+  readonly attentionFindings = computed(() =>
+    (this.workspace()?.readiness ?? []).filter((item) => item.status !== 'Healthy'),
+  );
+  readonly readyFindings = computed(() =>
+    (this.workspace()?.readiness ?? []).filter((item) => item.status === 'Healthy'),
+  );
+  readonly readinessPercent = computed(() => {
+    const total = this.workspace()?.readiness.length ?? 0;
+    return total ? Math.round((this.readyFindings().length / total) * 100) : 0;
+  });
   readonly primaryActionLabel = computed(() => this.nextActionLabel());
 
   private progressTimer: ReturnType<typeof setInterval> | null = null;
@@ -252,6 +262,13 @@ export class GenesisComponent implements OnInit, OnDestroy {
   async runPrimaryAction(): Promise<void> {
     const action = this.workspace()?.nextTask.action;
     if (!action || this.pending()) return;
+    if (this.primaryActionIsRefreshOnly()) {
+      await this.perform('refresh', async () => {
+        await this.reloadWorkspace();
+        this.message.set('Solslot checked the launch services again.');
+      });
+      return;
+    }
     switch (action) {
       case 'enrollment':
         this.focusElement('administrator-team');
@@ -500,7 +517,36 @@ export class GenesisComponent implements OnInit, OnDestroy {
   }
 
   displayRole(role: string): string {
-    return role === 'owner' ? 'Owner' : role === 'coadmin' ? 'Coadministrator' : role;
+    const labels: Record<string, string> = {
+      owner: 'Owner',
+      coadmin: 'Coadministrator',
+      administrator: 'Any administrator',
+      'technical-coadmin': 'Technical coadministrator',
+      system: 'Solslot system',
+    };
+    return labels[role] ?? role;
+  }
+
+  statusLabel(status: string): string {
+    const labels: Record<string, string> = {
+      Healthy: 'Ready',
+      'Needs action': 'Action needed',
+      Waiting: 'Waiting',
+      Blocked: 'Setup needed',
+    };
+    return labels[status] ?? status;
+  }
+
+  nextTaskNote(): string {
+    const task = this.workspace()?.nextTask;
+    if (!task) return '';
+    if (this.infrastructureAction(task.action)) {
+      return 'This is a protected server task. No administrator should paste keys, hashes, or configuration into this page.';
+    }
+    if (!this.taskAssignedToCurrentSession()) {
+      return `No signature is needed from you yet. ${this.displayRole(task.assignedRole)} owns this step.`;
+    }
+    return 'The button opens only the exact review or action needed for this step.';
   }
 
   decisionReceipt(): DecisionReceipt | null {
@@ -956,6 +1002,8 @@ export class GenesisComponent implements OnInit, OnDestroy {
 
   private nextActionLabel(): string {
     const action = this.workspace()?.nextTask.action;
+    if (this.infrastructureAction(action)) return 'Check setup again';
+    if (!this.taskAssignedToCurrentSession()) return 'Refresh status';
     const labels: Record<string, string> = {
       enrollment: 'Review administrator team',
       railOwnership: 'Continue rail ownership',
@@ -973,6 +1021,39 @@ export class GenesisComponent implements OnInit, OnDestroy {
       refresh: 'Refresh launch status',
     };
     return action ? (labels[action] ?? 'Continue') : 'Refresh';
+  }
+
+  private primaryActionIsRefreshOnly(): boolean {
+    return (
+      this.infrastructureAction(this.workspace()?.nextTask.action) ||
+      !this.taskAssignedToCurrentSession()
+    );
+  }
+
+  private infrastructureAction(action?: string | null): boolean {
+    return new Set([
+      'replaceReleaseEvidence',
+      'replacePlanEvidence',
+      'installEvmEvidence',
+      'configureValidators',
+      'restoreChiaNode',
+      'configureFeeTill',
+    ]).has(action ?? '');
+  }
+
+  private taskAssignedToCurrentSession(): boolean {
+    const task = this.workspace()?.nextTask;
+    const role = this.workspace()?.session.role;
+    if (!task || !role) return false;
+    if (task.assignedRole === 'administrator') return true;
+    if (task.assignedRole === 'owner') return role === 'owner';
+    if (
+      task.assignedRole === 'coadmin' ||
+      task.assignedRole === 'technical-coadmin'
+    ) {
+      return role === 'coadmin';
+    }
+    return false;
   }
 
   private consumeFragment(): void {
