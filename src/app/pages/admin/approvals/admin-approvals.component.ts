@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import {
   AdminOperationApproval,
   AdminOperationApprovalService,
@@ -13,17 +12,17 @@ import { formatError } from '../../../utils/format-error';
 @Component({
   selector: 'app-admin-approvals',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, AdminWorkspaceNavComponent],
   template: `
+    <solslot-admin-workspace-nav />
     <main class="approval-desk">
       <header class="desk-header">
         <div>
-          <span class="eyebrow">Owner-plus-one authority</span>
+          <span class="eyebrow">Independent review</span>
           <h1>Approval inbox</h1>
-          <p>Review work requested by collections, minting, presales, and protocol operations.</p>
+          <p>Approve only after the purpose, effect, and wallet request all agree.</p>
         </div>
         <div class="header-actions">
-          <a routerLink="/admin" class="button button--quiet">Dashboard</a>
           <button type="button" class="button button--quiet" (click)="reload()" [disabled]="busy()">
             Refresh
           </button>
@@ -104,6 +103,12 @@ import { formatError } from '../../../utils/format-error';
               <span>{{ operationContext(item) }}</span>
             </div>
 
+            <div class="signing-check">
+              <strong>Before signing</strong>
+              <span>Confirm the wallet shows the same network and action described above.</span>
+              <span>Reject unexpected payments, approvals, recipients, or recovery-phrase requests.</span>
+            </div>
+
             <div class="signers" aria-label="Recorded signatures">
               @for (signature of item.signatures; track signature.adminIndex) {
                 <span>Administrator {{ signature.adminIndex + 1 }} approved</span>
@@ -135,7 +140,7 @@ import { formatError } from '../../../utils/format-error';
                   (click)="sign()"
                   [disabled]="busy() || item.status === 'consumed'"
                 >
-                  Review and approve
+                  Approve this request
                 </button>
               }
               <button
@@ -144,7 +149,7 @@ import { formatError } from '../../../utils/format-error';
                 (click)="execute()"
                 [disabled]="busy() || item.status !== 'approved' || !signedByCurrentAdmin(item)"
               >
-                Execute approved action
+                Complete approved action
               </button>
             </div>
           } @else {
@@ -180,6 +185,8 @@ import { formatError } from '../../../utils/format-error';
       .decision-grid div { padding:13px; background:#081612; }
       dt { color:#8fb5a6; font-size:11px; } dd { margin:4px 0 0; overflow-wrap:anywhere; }
       .impact { display:grid; gap:5px; padding:15px; border-left:3px solid #67e7ad; background:#0d241d; }
+      .signing-check { display:grid; gap:4px; margin-top:12px; padding:13px; border-left:3px solid #77bce3; background:#091b1d; font-size:11px; }
+      .signing-check span { color:#a9c2b8; }
       .signers { display:flex; flex-wrap:wrap; gap:7px; margin:18px 0; }
       .signers span { border:1px solid #356858; padding:6px 9px; font-size:11px; }
       details { margin-top:18px; border-top:1px solid #245144; padding-top:14px; }

@@ -1,4 +1,10 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EvmWalletService } from '../../../services/evm-wallet.service';
@@ -31,98 +37,162 @@ import { formatError } from '../../../utils/format-error';
   selector: 'pp-admin-login',
   standalone: true,
   imports: [CommonModule, RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="container-p pt-16 pb-24 max-w-2xl">
-      <div class="mono text-[0.7rem] uppercase tracking-[0.25em] text-brand mb-4">
-        Solslot · Admin Desk
-      </div>
-      <h1 class="font-display text-4xl md:text-5xl">Sign in.</h1>
-      <p class="mt-4 text-text-muted max-w-xl">
-        Authenticate with an EIP-712-capable EVM key in the signed Solslot
-        genesis administrator roster. The proof is bound to this deployment's
-        chain id and protocol domain; nothing is broadcast on chain.
-      </p>
+    <main class="login-page">
+      <a routerLink="/" class="back-link">&larr; Protocol status</a>
 
-      <div class="mt-10 card">
-        <div class="flex items-start justify-between gap-4">
-          <div class="min-w-0">
-            <div class="mono text-xs uppercase tracking-[0.2em] text-text-muted">
-              Wallet
-            </div>
-            <div class="mt-2 font-display text-2xl truncate">
-              @if (walletAddress(); as a) {
-                {{ a }}
-              } @else {
-                Not connected
-              }
-            </div>
+      <div class="login-layout">
+        <section class="welcome" aria-labelledby="admin-sign-in-title">
+          <span class="eyebrow">Solslot administration</span>
+          <h1 id="admin-sign-in-title">Welcome back</h1>
+          <p>
+            Use the administrator wallet assigned to you. Your wallet will ask for
+            a sign-in signature. This does not send a transaction or move funds.
+          </p>
+
+          <div class="safety-brief" aria-labelledby="sign-in-safety-title">
+            <h2 id="sign-in-safety-title">Before you connect</h2>
+            <ul>
+              <li>Confirm the address bar shows the official Solslot admin site.</li>
+              <li>Use only your enrolled administrator wallet.</li>
+              <li>Never enter or share a recovery phrase, private key, or wallet password.</li>
+            </ul>
           </div>
-          @if (walletAddress()) {
-            <button
-              class="text-xs mono uppercase tracking-[0.18em] text-text-muted hover:text-brand"
-              type="button"
-              (click)="disconnect()"
-            >
-              Disconnect
-            </button>
-          }
-        </div>
 
-        <div class="mt-6 grid gap-3 sm:grid-cols-2">
+          <details>
+            <summary>How this sign-in is protected</summary>
+            <p>
+              Solslot verifies the signature against the administrator team recorded
+              at launch. The request is time-limited and tied to this Testnet11 release.
+            </p>
+          </details>
+        </section>
+
+        <section class="sign-in-card" aria-label="Administrator wallet sign-in">
+          <header>
+            <div>
+              <span class="eyebrow">Administrator wallet</span>
+              <strong>
+                @if (walletAddress(); as address) {
+                  {{ shortWallet(address) }}
+                } @else {
+                  Choose how to connect
+                }
+              </strong>
+            </div>
+            @if (walletAddress()) {
+              <button class="quiet-action" type="button" (click)="disconnect()">
+                Change wallet
+              </button>
+            }
+          </header>
+
           @if (!walletAddress()) {
-            <button
-              class="btn btn--primary"
-              type="button"
-              (click)="connectInjected()"
-              [disabled]="busy()"
-            >
-              Connect injected wallet
-            </button>
-            <button
-              class="btn btn--ghost"
-              type="button"
-              (click)="connectWalletConnect()"
-              [disabled]="busy()"
-            >
-              WalletConnect
-            </button>
+            <div class="connection-options">
+              <button
+                class="connect-option"
+                type="button"
+                (click)="connectInjected()"
+                [disabled]="busy()"
+              >
+                <span aria-hidden="true">01</span>
+                <span>
+                  <strong>Browser wallet</strong>
+                  <small>MetaMask, Rabby, Coinbase Wallet, or another installed wallet</small>
+                </span>
+              </button>
+              <button
+                class="connect-option"
+                type="button"
+                (click)="connectWalletConnect()"
+                [disabled]="busy()"
+              >
+                <span aria-hidden="true">02</span>
+                <span>
+                  <strong>Mobile or hardware wallet</strong>
+                  <small>WalletConnect, including compatible Tangem and hardware wallets</small>
+                </span>
+              </button>
+            </div>
           } @else {
+            <div class="connected-wallet">
+              <span>Connected address</span>
+              <code>{{ walletAddress() }}</code>
+            </div>
             <button
-              class="btn btn--primary sm:col-span-2"
+              class="primary-action"
               type="button"
               (click)="signIn()"
               [disabled]="busy()"
             >
-              @if (busy()) {
-                Signing in&hellip;
-              } @else {
-                Sign in as Admin
-              }
+              {{ busy() ? 'Waiting for wallet...' : 'Continue securely' }}
             </button>
+            <p class="signature-note">
+              Check that your wallet says <strong>Sign</strong>, not Send, Approve, or Transfer.
+            </p>
           }
-        </div>
+
+          @if (status()) {
+            <div class="status" role="status">{{ status() }}</div>
+          }
+
+          @if (error()) {
+            <div class="error" role="alert">
+              <strong>We could not sign you in</strong>
+              <span>{{ error() }}</span>
+              <small>
+                Confirm that the connected wallet is one of the enrolled administrator wallets,
+                then try again.
+              </small>
+            </div>
+          }
+        </section>
       </div>
-
-      @if (status()) {
-        <div class="mt-6 mono text-sm text-text-muted">
-          {{ status() }}
-        </div>
-      }
-
-      @if (error()) {
-        <div class="mt-6 rounded-card border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
-          <div class="font-display text-base mb-1">Sign-in failed.</div>
-          <div class="mono text-xs">{{ error() }}</div>
-        </div>
-      }
-
-      <div class="mt-12 text-xs text-text-muted">
-        <a routerLink="/" class="hover:text-brand">&larr; Back to portal</a>
-        <span class="mx-2 opacity-40">·</span>
-        <a routerLink="/admin/genesis" class="hover:text-brand">Initialize genesis</a>
-      </div>
-    </section>
+    </main>
   `,
+  styles: [
+    `
+      :host { display:block; min-height:100vh; background:#04100e; color:#effcf7; }
+      .login-page { width:min(1040px,calc(100% - 32px)); margin:0 auto; padding:30px 0 80px; }
+      .back-link { color:#8ab6a4; font-size:12px; text-decoration:none; }
+      .login-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(360px,.78fr); gap:64px; align-items:start; margin-top:72px; }
+      .eyebrow { color:#67e7ad; font:700 11px/1.2 var(--font-mono); text-transform:uppercase; }
+      h1 { margin-top:10px; font:600 48px/1.05 var(--font-sans); letter-spacing:0; }
+      .welcome > p { max-width:590px; margin-top:18px; color:#aac4b9; font-size:16px; line-height:1.65; }
+      .safety-brief { margin-top:34px; padding:20px 0; border-block:1px solid #21483d; }
+      h2 { font:600 15px/1.3 var(--font-sans); letter-spacing:0; }
+      ul { display:grid; gap:10px; margin:15px 0 0; padding-left:20px; color:#c2d8cf; font-size:13px; }
+      details { margin-top:18px; color:#91ada1; font-size:12px; }
+      summary { color:#79dbae; cursor:pointer; }
+      details p { margin-top:9px; max-width:600px; line-height:1.6; }
+      .sign-in-card { border:1px solid #295448; background:#091b16; box-shadow:0 24px 70px rgba(0,0,0,.36); }
+      .sign-in-card > header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px; border-bottom:1px solid #21483d; }
+      .sign-in-card header > div { display:grid; gap:7px; min-width:0; }
+      .sign-in-card header strong { overflow:hidden; color:#f4fff9; font-size:18px; text-overflow:ellipsis; }
+      .quiet-action { border:0; background:none; color:#75d8aa; font-size:11px; cursor:pointer; }
+      .connection-options { display:grid; gap:1px; background:#21483d; }
+      .connect-option { display:grid; grid-template-columns:34px minmax(0,1fr); gap:12px; align-items:start; padding:18px 20px; border:0; background:#091713; color:inherit; text-align:left; cursor:pointer; }
+      .connect-option:hover { background:#0d251e; }
+      .connect-option > span:first-child { display:grid; width:30px; height:30px; place-items:center; border:1px solid #3c7361; color:#67e7ad; font:10px var(--font-mono); }
+      .connect-option > span:last-child { display:grid; gap:4px; }
+      .connect-option strong { font-size:14px; }
+      .connect-option small { color:#91ada1; font-size:11px; line-height:1.5; }
+      .connect-option:disabled,.primary-action:disabled { cursor:not-allowed; opacity:.55; }
+      .connected-wallet { display:grid; gap:7px; margin:20px 20px 0; padding:13px; background:#06110f; }
+      .connected-wallet span { color:#8dab9f; font-size:10px; text-transform:uppercase; }
+      .connected-wallet code { overflow:hidden; color:#cce6da; font-size:11px; text-overflow:ellipsis; }
+      .primary-action { width:calc(100% - 40px); margin:14px 20px 0; padding:13px 16px; border:1px solid #73e5b2; background:#67e7ad; color:#04110d; font-weight:700; cursor:pointer; }
+      .signature-note { margin:11px 20px 20px; color:#91ada1; font-size:11px; line-height:1.5; }
+      .status,.error { margin:0 20px 20px; padding:12px; font-size:12px; }
+      .status { border-left:2px solid #67e7ad; background:#0d251e; color:#bcd8cb; }
+      .error { display:grid; gap:5px; border:1px solid #824f4f; background:#261414; color:#ffd0d0; }
+      .error span,.error small { line-height:1.5; }
+      .error small { color:#cfa7a7; }
+      @media (max-width:780px) { .login-layout { grid-template-columns:1fr; gap:32px; margin-top:42px; } h1 { font-size:38px; } }
+      @media (max-width:440px) { .login-page { width:calc(100% - 20px); } .sign-in-card > header { align-items:flex-start; flex-direction:column; } }
+    `,
+  ],
 })
 export class AdminLoginComponent {
   private readonly evm = inject(EvmWalletService);
@@ -181,6 +251,10 @@ export class AdminLoginComponent {
     await this.evm.disconnect();
   }
 
+  shortWallet(value: string): string {
+    return value.length > 18 ? `${value.slice(0, 10)}...${value.slice(-6)}` : value;
+  }
+
   async signIn(): Promise<void> {
     const address = this.walletAddress();
     if (!address) {
@@ -190,15 +264,15 @@ export class AdminLoginComponent {
     this.error.set(null);
     this.busy.set(true);
     try {
-      this.status.set('Requesting a one-time API challenge…');
+      this.status.set('Preparing a secure sign-in request...');
       const challenge = await this.backendAuth.requestChallenge(address);
       const typedData = challenge.typed_data;
 
-      this.status.set('Awaiting wallet signature…');
+      this.status.set('Check your wallet and approve the sign-in signature.');
       const signature = await this.evm.signTypedData(typedData);
       const pubkey = this.evm.recoverCompressedPubkey(typedData, signature);
 
-      this.status.set('Verifying admin membership and opening the shared workspace…');
+      this.status.set('Confirming your administrator role...');
       const apiSession = await this.backendAuth.login(address, challenge.nonce, signature);
       await this.session.loginWithWallet({
         address,
@@ -210,7 +284,7 @@ export class AdminLoginComponent {
         jwt: apiSession.jwt,
       });
 
-      this.status.set('Signed in. Redirecting…');
+      this.status.set('Signed in. Opening your task list...');
       await this.router.navigate([this.targetUrl()]);
     } catch (e) {
       this.error.set(formatError(e));

@@ -59,7 +59,7 @@ export const routes: Routes = [
       import('./pages/admin/genesis/genesis.component').then(
         (m) => m.GenesisComponent,
       ),
-    title: 'Genesis Launch · Solslot',
+    title: 'Alpha Protocol Launch · Solslot',
   },
   {
     path: 'admin',
@@ -80,7 +80,7 @@ export const routes: Routes = [
       import('./pages/admin/collections/collections.component').then(
         (m) => m.CollectionsComponent,
       ),
-    title: 'Collection Minting · Solslot',
+    title: 'Properties · Solslot',
   },
   {
     path: 'admin/collections/:id',
@@ -93,12 +93,8 @@ export const routes: Routes = [
   },
   {
     path: 'admin/omnichain-activation',
-    canActivate: [adminAuthGuard],
-    loadComponent: () =>
-      import(
-        './pages/admin/omnichain-ownership-activation/omnichain-ownership-activation.component'
-      ).then((m) => m.OmnichainOwnershipActivationComponent),
-    title: 'Base Sepolia Ownership · Solslot',
+    redirectTo: 'admin/genesis',
+    pathMatch: 'full',
   },
   {
     path: 'admin/sales',
@@ -125,7 +121,7 @@ export const routes: Routes = [
       import('./pages/admin/mint-list/mint-list.component').then(
         (m) => m.MintListComponent,
       ),
-    title: 'Mint Proposals · Solslot',
+    title: 'SmartDeed Proposals · Solslot',
   },
   {
     path: 'admin/mint/new',
@@ -174,7 +170,7 @@ export const routes: Routes = [
       import('./pages/admin/mint-detail/mint-detail.component').then(
         (m) => m.MintDetailComponent,
       ),
-    title: 'Mint Proposal · Solslot',
+    title: 'SmartDeed Proposal · Solslot',
   },
   {
     path: 'admin/authority',
@@ -183,7 +179,7 @@ export const routes: Routes = [
       import('./pages/admin/admin-authority/admin-authority.component').then(
         (m) => m.AdminAuthorityComponent,
       ),
-    title: 'Current Authority · Solslot',
+    title: 'Administrator Team · Solslot',
   },
   {
     path: 'admin/approvals',
@@ -192,7 +188,7 @@ export const routes: Routes = [
       import('./pages/admin/approvals/admin-approvals.component').then(
         (m) => m.AdminApprovalsComponent,
       ),
-    title: 'Admin Approvals · Solslot',
+    title: 'Approval Inbox · Solslot',
   },
   {
     // Public: no guard.  Per POP-CANON-013 the committee endpoints are

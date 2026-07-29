@@ -46,7 +46,8 @@ describe('SolsLiquidityComponent', () => {
     expect(text).toContain('Uniswap V3');
     expect(text).toContain('Aerodrome');
     expect(text).toContain('TibetSwap');
-    expect(text).toContain('Community pools are permissionless, not protocol trusted');
+    expect(text).toContain('Community pools are separate from approved Solslot routes');
+    expect(text).toContain('It remains community-run');
   });
 
   it('renders governed values and SOLS units', () => {

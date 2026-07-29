@@ -1,3 +1,10 @@
+@if (workspace()) {
+  <solslot-admin-workspace-nav
+    [externalSignOut]="true"
+    (signOutRequested)="logout()"
+  />
+}
+
 <main class="launch-shell">
   @if (error()) {
     <div class="launch-alert launch-alert--error" role="alert">
@@ -119,7 +126,6 @@
       </div>
       <div class="launch-header__actions">
         <span class="wallet-label">{{ connectedWalletLabel() }}</span>
-        <button type="button" class="btn btn--ghost" (click)="logout()">Sign out</button>
       </div>
     </header>
 
@@ -337,6 +343,16 @@
                 </dd>
               </div>
             </dl>
+            @if (rail.status.submission; as submission) {
+              <div class="operation-callout">
+                <strong>Submitted to Base Sepolia</strong>
+                <span>
+                  Solslot saved this exact transaction and will keep checking it automatically.
+                  You do not need to submit it again.
+                </span>
+                <small class="mono">{{ submission.transactionHash }}</small>
+              </div>
+            }
           }
           <div class="inline-actions">
             <button
@@ -479,7 +495,7 @@
             <div class="section-heading">
               <div>
                 <span class="eyebrow">Required before customer sales</span>
-                <h2>Prove the payment path</h2>
+                <h2>Run the customer payment check</h2>
               </div>
               <span
                 [class]="
@@ -500,8 +516,8 @@
               </span>
             </div>
             <p>
-              Complete one test delivery and one full refund before customer sales can open. Only
-              Base Sepolia test USDC is used.
+              Use the same test SmartDeed twice. The first payment must deliver it. The second must
+              return every test dollar because that deed is no longer available.
             </p>
             <ol class="payment-checklist" aria-label="Customer payment activation steps">
               <li [class.is-complete]="rehearsalCompleted(1)">
@@ -522,7 +538,7 @@
                 <span>3</span>
                 <div>
                   <strong>Prove a full refund</strong>
-                  <small>A second test payment must return to the same wallet in full.</small>
+                  <small>Pay the same amount for the same deed and confirm every test dollar returns.</small>
                 </div>
               </li>
               <li [class.is-complete]="rehearsalCompleted(4)">
@@ -547,6 +563,39 @@
                 }}
               </span>
             </div>
+            @if (settlementRehearsal()?.status?.review; as review) {
+              <dl class="payment-review" aria-label="Current payment test">
+                <div>
+                  <dt>Amount</dt>
+                  <dd>{{ review.amountLabel }}</dd>
+                </div>
+                <div>
+                  <dt>Expected</dt>
+                  <dd>{{ review.expectedOutcome === 'DELIVERED' ? 'Deed delivered' : 'Full refund' }}</dd>
+                </div>
+                <div>
+                  <dt>Network</dt>
+                  <dd>Base Sepolia</dd>
+                </div>
+              </dl>
+              <details>
+                <summary>Verify exact destination</summary>
+                <dl class="technical-grid">
+                  <div>
+                    <dt>Escrow</dt>
+                    <dd class="mono">{{ review.escrow }}</dd>
+                  </div>
+                  <div>
+                    <dt>Test vault</dt>
+                    <dd class="mono">{{ review.destinationVault }}</dd>
+                  </div>
+                  <div>
+                    <dt>Test deed</dt>
+                    <dd class="mono">{{ review.deedLauncherId }}</dd>
+                  </div>
+                </dl>
+              </details>
+            }
             <div class="inline-actions">
               <button
                 type="button"
@@ -575,16 +624,17 @@
           <section class="workspace-section" aria-labelledby="operation-windows-title">
             <div class="section-heading">
               <div>
-                <span class="eyebrow">Owner plus one · 30 minutes</span>
-                <h2 id="operation-windows-title">Operational write windows</h2>
+                <span class="eyebrow">Owner + coadmin approval · 30 minutes</span>
+                <h2 id="operation-windows-title">Choose what can go live</h2>
               </div>
               <button type="button" class="btn btn--primary" (click)="openOperations()">
                 Open operations dashboard
               </button>
             </div>
             <p>
-              Drafting and review remain available. Each chain-writing operation opens separately,
-              closes automatically, and cannot override the server emergency lock.
+              Open only the activity your team is ready to supervise. Each opening closes
+              automatically. Drafting stays available, and payments already in progress continue
+              safely through delivery or refund.
             </p>
             <div class="operation-window-list">
               @for (name of operationGateNames; track name) {
@@ -601,7 +651,7 @@
                           : 'status status--waiting'
                       "
                     >
-                      {{ gateOpen(name) ? 'Open' : 'Closed' }}
+                      {{ gateOpen(name) ? 'Open for new activity' : 'Closed to new activity' }}
                     </span>
                     @if (gateOpen(name)) {
                       <small>Closes {{ formatTime(workspace()!.gates[name]?.closesAt) }}</small>
@@ -619,7 +669,7 @@
                         "
                         (click)="reviewOperationWindow(name)"
                       >
-                        Review window
+                        Review 30-minute opening
                       </button>
                     }
                     @if (
@@ -636,7 +686,7 @@
                         "
                         (click)="activateOperationWindow(name)"
                       >
-                        Open approved window
+                        Open for 30 minutes
                       </button>
                     }
                     @if (name !== 'minting' && !customerPaymentsReady()) {
@@ -764,11 +814,23 @@
             </div>
           }
         </dl>
-        @if (decision.kind === 'rehearsal-payment') {
-          <p class="wallet-review">
-            Your wallet will show one Base Sepolia test transaction. Confirm that its network and
-            effect match this receipt.
-          </p>
+        @if (decision.kind === 'rail-broadcast') {
+          <div class="wallet-review">
+            <strong>What your wallet will show</strong>
+            <span>
+              A Base Sepolia transaction to the reviewed Root Safe. It moves no protocol or
+              customer funds; the submitting wallet pays only test-network gas.
+            </span>
+          </div>
+        } @else if (decision.kind === 'rehearsal-payment') {
+          <div class="wallet-review">
+            <strong>Before you approve</strong>
+            <span>
+              Use only the enrolled admin wallet shown in your browser. Confirm Base Sepolia and
+              {{ decision.rehearsal.status.review?.amountLabel || 'the fixed test amount' }}.
+              Never share your recovery phrase or approve an unlimited amount.
+            </span>
+          </div>
         } @else {
           <p class="wallet-review">
             Your wallet will show a signature request for only this exact Testnet action.
@@ -785,6 +847,8 @@
             {{
               decision.kind === 'broadcast'
                 ? 'Launch Testnet protocol'
+                : decision.kind === 'rail-broadcast'
+                  ? 'Submit reviewed Safe action'
                 : decision.kind === 'rehearsal-payment'
                   ? rehearsalActionLabel(decision.rehearsal)
                   : 'Approve exact action'

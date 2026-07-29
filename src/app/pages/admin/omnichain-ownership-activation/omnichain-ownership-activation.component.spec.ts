@@ -80,6 +80,7 @@ describe('OmnichainOwnershipActivationComponent', () => {
     ],
     broadcastTransaction: null,
     broadcast: null,
+    submission: null,
   };
 
   let fixture: ComponentFixture<OmnichainOwnershipActivationComponent>;

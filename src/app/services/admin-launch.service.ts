@@ -408,6 +408,8 @@ export interface RailOwnershipStatus {
   state:
     | 'AWAITING_APPROVALS'
     | 'READY_TO_BROADCAST'
+    | 'BROADCAST_PENDING'
+    | 'CONFIRMING'
     | 'SCHEDULED'
     | 'WAITING_FOR_SCHEDULE'
     | 'WAITING_FOR_DELAY'
@@ -422,6 +424,11 @@ export interface RailOwnershipStatus {
     transactionHash: string;
     confirmations: number;
     minimumConfirmations: number;
+  } | null;
+  submission?: {
+    transactionHash: string;
+    submittedBy: string;
+    submittedAt: number;
   } | null;
 }
 
@@ -458,6 +465,17 @@ export interface SettlementRehearsalStatus {
   message: string;
   assignedRole?: 'coadmin';
   walletTransaction?: BaseSepoliaTransaction | null;
+  review?: {
+    action: 'approve' | 'pay' | 'verify';
+    lane: 'delivery' | 'refund';
+    asset: 'USDC';
+    amountMinor: string;
+    amountLabel: string;
+    escrow: string;
+    destinationVault: string;
+    deedLauncherId: string;
+    expectedOutcome: 'DELIVERED' | 'REFUND';
+  } | null;
   evidenceDigest?: string | null;
   updatedAt?: number | null;
 }

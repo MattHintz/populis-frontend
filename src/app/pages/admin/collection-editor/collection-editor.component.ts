@@ -4,6 +4,7 @@ import { Component, OnDestroy, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import { PropertyDossierComponent } from '../../../components/property-dossier/property-dossier.component';
 import { AdminSessionService } from '../../../services/admin-session.service';
 import {
@@ -52,8 +53,15 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
 @Component({
   selector: 'pp-collection-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, PropertyDossierComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    AdminWorkspaceNavComponent,
+    PropertyDossierComponent,
+  ],
   template: `
+    <solslot-admin-workspace-nav />
     <main class="editor-shell">
       @if (loading()) {
         <div class="page-state mono">Loading shared collection workspace…</div>
@@ -71,7 +79,7 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
               <div>
                 <span class="state" [attr.data-state]="collection.state">{{ collection.state }}</span>
                 <h1>{{ draft.title }}</h1>
-                <p class="mono">{{ collection.id }} · revision {{ collection.revision }}</p>
+                <p>Shared workspace · version {{ collection.revision }}</p>
               </div>
             </div>
             <div class="header-actions">
@@ -93,7 +101,10 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
 
           <div class="editor-layout">
             <nav class="section-nav" aria-label="Collection workspace sections">
-              @for (item of sections; track item.id) {
+              @for (item of sections; track item.id; let index = $index) {
+                @if (showSectionGroup(index)) {
+                  <span class="section-group">{{ item.group }}</span>
+                }
                 <button
                   type="button"
                   [class.is-active]="activeSection() === item.id"
@@ -475,7 +486,7 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
                 }
 
                 @case ('governance') {
-                  <div class="section-head"><span>RC16 governed issuance</span><h2>Governance status</h2></div>
+                  <div class="section-head"><span>Independent protocol approval</span><h2>Governance status</h2></div>
                   @if (collection.state === 'DRAFT' || collection.state === 'REVIEW') {
                     <section class="locked-state"><strong>Seal the dossier first</strong><span>Proposal hashes cannot be prepared from mutable metadata.</span></section>
                   } @else {
@@ -528,6 +539,26 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
                   }
                 }
               }
+
+              <nav class="section-progress" aria-label="Property workspace progress">
+                <button
+                  type="button"
+                  class="btn btn--ghost"
+                  (click)="moveSection(-1)"
+                  [disabled]="activeSectionIndex() === 0"
+                >
+                  Back
+                </button>
+                <span>Step {{ activeSectionIndex() + 1 }} of {{ sections.length }}</span>
+                <button
+                  type="button"
+                  class="btn btn--primary"
+                  (click)="moveSection(1)"
+                  [disabled]="activeSectionIndex() === sections.length - 1"
+                >
+                  Continue
+                </button>
+              </nav>
             </section>
 
             <aside class="review-rail">
@@ -556,10 +587,14 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
       .save-state[data-state='error'],.save-state[data-state='conflict'] { color:#ffaaa1; }
       .editor-layout { display:grid; grid-template-columns:12rem minmax(0,1fr) 13rem; gap:1.25rem; padding-top:1.25rem; }
       .section-nav { position:sticky; top:5.75rem; align-self:start; display:grid; }
+      .section-group { margin:1rem .65rem .35rem; color:#77a393; font:700 .54rem var(--font-mono); text-transform:uppercase; }
+      .section-group:first-child { margin-top:0; }
       .section-nav button { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.6rem .65rem; border:0; border-left:2px solid transparent; background:none; color:var(--muted); text-align:left; font-size:.68rem; cursor:pointer; }
       .section-nav button.is-active { color:var(--text); border-left-color:var(--accent); background:rgba(124,255,178,.05); }
       .section-nav button.has-issues small { color:#ffaaa1; }
       .editor-main { min-width:0; padding:0 1.25rem 3rem; border-inline:1px solid var(--border); }
+      .section-progress { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:1rem; margin-top:2rem; padding-top:1rem; border-top:1px solid var(--border); }
+      .section-progress span { color:var(--muted); font:.65rem var(--font-mono); text-align:center; }
       .section-head { margin-bottom:1.25rem; padding-bottom:.75rem; border-bottom:1px solid var(--border); }
       .section-head span,.rail-label { color:var(--accent); font:600 .57rem var(--font-mono); text-transform:uppercase; letter-spacing:.12em; }
       .section-head h2 { margin-top:.3rem; font:600 1.55rem var(--font-sans); letter-spacing:0; }
@@ -618,7 +653,7 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
       .page-state { display:flex; min-height:65vh; flex-direction:column; align-items:center; justify-content:center; gap:.75rem; color:var(--muted); text-align:center; }
       .page-state--error strong { color:#ffaaa1; }
       @media (max-width:1100px) { .editor-layout { grid-template-columns:10rem minmax(0,1fr); } .review-rail { display:none; } }
-      @media (max-width:760px) { .editor-header { position:static; align-items:flex-start; flex-direction:column; padding:.75rem 0; } .title-block { align-items:flex-start; flex-direction:column; } .editor-layout { grid-template-columns:1fr; } .section-nav { position:static; display:flex; overflow-x:auto; border-bottom:1px solid var(--border); } .section-nav button { flex:0 0 auto; border-left:0; border-bottom:2px solid transparent; } .section-nav button.is-active { border-bottom-color:var(--accent); } .editor-main { padding-inline:0; border:0; } fieldset,.field-grid,.upload-strip,.commitment-grid { grid-template-columns:1fr; } .span-2,.full { grid-column:auto; } .comments article,.asset-table article,.proposal-list article { grid-template-columns:1fr; } }
+      @media (max-width:760px) { .editor-header { position:static; align-items:flex-start; flex-direction:column; padding:.75rem 0; } .title-block { align-items:flex-start; flex-direction:column; } .editor-layout { grid-template-columns:1fr; } .section-nav { position:static; display:flex; overflow-x:auto; border-bottom:1px solid var(--border); } .section-group { display:none; } .section-nav button { flex:0 0 auto; border-left:0; border-bottom:2px solid transparent; } .section-nav button.is-active { border-bottom-color:var(--accent); } .editor-main { padding-inline:0; border:0; } fieldset,.field-grid,.upload-strip,.commitment-grid { grid-template-columns:1fr; } .span-2,.full { grid-column:auto; } .comments article,.asset-table article,.proposal-list article { grid-template-columns:1fr; } }
     `,
   ],
 })
@@ -629,23 +664,23 @@ export class CollectionEditorComponent implements OnDestroy {
   private readonly mint = inject(CollectionMintCoordinatorService);
   private readonly amendments = inject(PropertyAmendmentService);
 
-  readonly sections: Array<{ id: EditorSection; label: string }> = [
-    { id: 'classification', label: 'Classification' },
-    { id: 'overview', label: 'Overview' },
-    { id: 'property', label: 'Property' },
-    { id: 'project', label: 'Project' },
-    { id: 'media', label: 'Media' },
-    { id: 'economics', label: 'Economics' },
-    { id: 'operations', label: 'Operations' },
-    { id: 'legal', label: 'Legal' },
-    { id: 'risks', label: 'Risks' },
-    { id: 'documents', label: 'Documents' },
-    { id: 'allocation', label: 'Deed allocation' },
-    { id: 'review', label: 'Review' },
-    { id: 'governance', label: 'Governance' },
-    { id: 'presale', label: 'Presale' },
-    { id: 'sales', label: 'Sales' },
-    { id: 'updates', label: 'Updates' },
+  readonly sections: Array<{ id: EditorSection; label: string; group: string }> = [
+    { id: 'classification', label: 'Property type', group: 'Start' },
+    { id: 'overview', label: 'Summary', group: 'Start' },
+    { id: 'property', label: 'Facts & location', group: 'Property' },
+    { id: 'project', label: 'Project diligence', group: 'Property' },
+    { id: 'media', label: 'Photos & media', group: 'Property' },
+    { id: 'economics', label: 'Financials', group: 'Due diligence' },
+    { id: 'operations', label: 'Operations', group: 'Due diligence' },
+    { id: 'legal', label: 'Legal structure', group: 'Due diligence' },
+    { id: 'risks', label: 'Risks', group: 'Due diligence' },
+    { id: 'documents', label: 'Documents', group: 'Due diligence' },
+    { id: 'allocation', label: 'SmartDeed plan', group: 'Issuance' },
+    { id: 'review', label: 'Review & approval', group: 'Issuance' },
+    { id: 'governance', label: 'Governance', group: 'Issuance' },
+    { id: 'presale', label: 'Reservations', group: 'Customer operations' },
+    { id: 'sales', label: 'Pricing', group: 'Customer operations' },
+    { id: 'updates', label: 'Updates', group: 'Customer operations' },
   ];
   readonly workspace = signal<CollectionWorkspace | null>(null);
   readonly feature = signal<CollectionFeatureStatus | null>(null);
@@ -753,6 +788,22 @@ export class CollectionEditorComponent implements OnDestroy {
 
   humanize(value: string): string {
     return value.split('-').map((part) => part ? part[0].toUpperCase() + part.slice(1) : part).join(' ');
+  }
+
+  activeSectionIndex(): number {
+    const index = this.sections.findIndex((section) => section.id === this.activeSection());
+    return index < 0 ? 0 : index;
+  }
+
+  showSectionGroup(index: number): boolean {
+    return index === 0 || this.sections[index - 1]?.group !== this.sections[index]?.group;
+  }
+
+  moveSection(direction: -1 | 1): void {
+    const next = this.sections[this.activeSectionIndex() + direction];
+    if (!next) return;
+    this.activeSection.set(next.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   availableSubtypes(): string[] {

@@ -41,6 +41,8 @@ export class OmnichainOwnershipActivationService {
 export type OwnershipActivationState =
   | 'AWAITING_APPROVALS'
   | 'READY_TO_BROADCAST'
+  | 'BROADCAST_PENDING'
+  | 'CONFIRMING'
   | 'SCHEDULED'
   | 'READY_TO_EXECUTE'
   | 'DONE';
@@ -91,4 +93,9 @@ export interface OwnershipActivationStatus {
   approvals: OwnershipSafeApproval[];
   broadcastTransaction: BaseSepoliaTransaction | null;
   broadcast: OwnershipBroadcastRecord | null;
+  submission: {
+    transactionHash: string;
+    submittedBy: string;
+    submittedAt: number;
+  } | null;
 }

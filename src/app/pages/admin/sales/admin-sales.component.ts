@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import {
   CollectionApiService,
   PresaleSeries,
@@ -13,17 +14,17 @@ import { formatError } from '../../../utils/format-error';
 @Component({
   selector: 'solslot-admin-sales',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, AdminWorkspaceNavComponent],
   template: `
+    <solslot-admin-workspace-nav />
     <main class="sales-desk">
       <header>
         <div>
-          <span class="eyebrow">Customer fulfillment</span>
+          <span class="eyebrow">Customer activity</span>
           <h1>Sales & refunds</h1>
-          <p>Track each refundable voucher from confirmed payment through SmartDeed delivery or exact refund.</p>
+          <p>See what customers paid, what was delivered, and what still needs attention.</p>
         </div>
         <div class="actions">
-          <a routerLink="/admin">Dashboard</a>
           <button type="button" (click)="reload()" [disabled]="loading()">Refresh</button>
         </div>
       </header>
@@ -94,10 +95,10 @@ import { formatError } from '../../../utils/format-error';
       }
 
       <aside class="guardrail">
-        <strong>Deterministic fulfillment only</strong>
+        <strong>Customer terms cannot be changed here</strong>
         <span>
-          Recipient vault, paid asset, principal, and deed are fixed by the confirmed reservation.
-          Administrators cannot edit them from this desk.
+          The approved vault, payment, and SmartDeed are fixed when the reservation confirms.
+          This page can monitor or retry the same result, never redirect it.
         </span>
       </aside>
     </main>

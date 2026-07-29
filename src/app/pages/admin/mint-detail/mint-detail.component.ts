@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import { MintProposalResponse } from '../../../services/admin-api.service';
 import { AdminSessionService } from '../../../services/admin-session.service';
 import { Eip712LeafHashService } from '../../../services/eip712-leaf-hash.service';
@@ -49,8 +50,9 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
 @Component({
   selector: 'pp-admin-mint-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, AdminWorkspaceNavComponent],
   template: `
+    <solslot-admin-workspace-nav />
     <section class="container-p pt-12 pb-24 max-w-4xl">
       <header class="flex flex-wrap items-start justify-between gap-4">
         <div class="min-w-0">
@@ -89,41 +91,43 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
           @if (lifecycle(); as l) {
             <section class="card grid gap-4">
               <header class="flex flex-wrap items-center justify-between gap-3">
-                <h2 class="font-display text-2xl">Lifecycle</h2>
+                <div>
+                  <span class="form-label">Current step</span>
+                  <h2 class="font-display text-2xl">What happens next</h2>
+                </div>
                 <span class="notation-pill">{{ l.notation }}</span>
               </header>
               <div class="grid gap-3 md:grid-cols-2">
                 <div>
-                  <div class="form-label">Required action</div>
+                  <div class="form-label">Next action</div>
                   <div class="text-sm">{{ l.requiredAction }}</div>
                 </div>
                 <div>
-                  <div class="form-label">Mint-to-offer path</div>
+                  <div class="form-label">Expected result</div>
                   <div class="text-sm text-text-muted">{{ l.outcome }}</div>
                 </div>
               </div>
-              <dl class="grid gap-2 text-xs mono sm:grid-cols-2">
-                <div>
-                  <dt class="text-text-muted">proposal_hash</dt>
-                  <dd class="break-all">{{ l.diagnostics.proposalHash ?? '—' }}</dd>
-                </div>
-                <div>
-                  <dt class="text-text-muted">deed_full_puzhash</dt>
-                  <dd class="break-all">{{ l.diagnostics.deedFullPuzhash ?? '—' }}</dd>
-                </div>
-                <div>
-                  <dt class="text-text-muted">deed_launcher_id</dt>
-                  <dd class="break-all">{{ l.diagnostics.deedLauncherId ?? '—' }}</dd>
-                </div>
-                <div>
-                  <dt class="text-text-muted">offer_artifact_id</dt>
-                  <dd class="break-all">{{ l.diagnostics.offerArtifactId ?? '—' }}</dd>
-                </div>
-                <div class="sm:col-span-2">
-                  <dt class="text-text-muted">offer_artifact_hash</dt>
-                  <dd class="break-all">{{ l.diagnostics.offerArtifactHash ?? '—' }}</dd>
-                </div>
-              </dl>
+              <details class="technical-details">
+                <summary>Technical evidence</summary>
+                <dl class="grid gap-2 text-xs mono sm:grid-cols-2">
+                  <div>
+                    <dt class="text-text-muted">Proposal hash</dt>
+                    <dd class="break-all">{{ l.diagnostics.proposalHash ?? '—' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-text-muted">SmartDeed puzzle</dt>
+                    <dd class="break-all">{{ l.diagnostics.deedFullPuzhash ?? '—' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-text-muted">SmartDeed launcher</dt>
+                    <dd class="break-all">{{ l.diagnostics.deedLauncherId ?? '—' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-text-muted">Offer record</dt>
+                    <dd class="break-all">{{ l.diagnostics.offerArtifactId ?? '—' }}</dd>
+                  </div>
+                </dl>
+              </details>
             </section>
           }
 
@@ -146,18 +150,14 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
                 <div class="form-label">Royalty</div>
                 <div class="mono">{{ p.royalty_bps / 100 }}%</div>
               </div>
-              <div class="sm:col-span-2">
-                <div class="form-label">Royalty payee puzhash</div>
-                <div class="mono text-xs break-all">{{ p.royalty_puzhash }}</div>
-              </div>
-              <div class="sm:col-span-2">
-                <div class="form-label">Owner pubkey (proposer)</div>
-                <div class="mono text-xs break-all">{{ p.owner_pubkey }}</div>
-                @if (isOwner()) {
-                  <div class="text-xs text-brand mt-1">You are the proposer.</div>
-                }
-              </div>
             </div>
+            <details class="technical-details">
+              <summary>Signing and treasury evidence</summary>
+              <dl class="grid gap-2 text-xs mono">
+                <div><dt>Treasury puzzle hash</dt><dd class="break-all">{{ p.royalty_puzhash }}</dd></div>
+                <div><dt>Owner public key</dt><dd class="break-all">{{ p.owner_pubkey }}</dd></div>
+              </dl>
+            </details>
           </section>
 
           <section class="card grid gap-3">
@@ -178,11 +178,8 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
             </div>
           </section>
 
-          <section class="card grid gap-3">
-            <h2 class="font-display text-2xl">Computed hashes</h2>
-            <p class="text-xs text-text-muted">
-              Populated atomically by <code class="mono">/publish</code>; null while DRAFT.
-            </p>
+          <details class="card technical-archive">
+            <summary>Computed protocol commitments</summary>
             <dl class="grid gap-2 text-xs mono">
               <div>
                 <dt class="text-text-muted">smart_deed_inner_puzhash</dt>
@@ -201,14 +198,10 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
                 <dd class="break-all">{{ p.computed.proposal_hash ?? '—' }}</dd>
               </div>
             </dl>
-          </section>
+          </details>
 
-          <section class="card grid gap-3">
-            <h2 class="font-display text-2xl">On-chain ids</h2>
-            <p class="text-xs text-text-muted">
-              Populated by <code class="mono">/publish</code> and
-              <code class="mono">/execute</code> as the proposal moves through the lifecycle.
-            </p>
+          <details class="card technical-archive">
+            <summary>On-chain identifiers</summary>
             <dl class="grid gap-2 text-xs mono">
               <div>
                 <dt class="text-text-muted">proposal_tracker_coin_id</dt>
@@ -231,7 +224,7 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
                 <dd class="break-all">{{ p.on_chain.executed_bundle_id ?? '—' }}</dd>
               </div>
             </dl>
-          </section>
+          </details>
 
           <section class="card grid gap-3">
             <header class="flex flex-wrap items-center justify-between gap-3">
@@ -306,134 +299,45 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
           </section>
 
           @if (p.off_chain_metadata) {
-            <section class="card grid gap-3">
-              <h2 class="font-display text-2xl">Off-chain metadata</h2>
+            <details class="card technical-archive">
+              <summary>Legacy metadata record</summary>
               <pre class="mono text-xs whitespace-pre-wrap break-all">{{
                 formatMetadata(p.off_chain_metadata)
               }}</pre>
-            </section>
+            </details>
           }
 
           @if (canPublish()) {
             <section class="card grid gap-3">
-              <header class="flex items-baseline justify-between gap-3">
-                <h2 class="font-display text-2xl">Publish</h2>
-                <span class="mono text-[0.65rem] text-text-muted">4f alpha</span>
+              <header class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <span class="form-label">Owner action</span>
+                  <h2 class="font-display text-2xl">Submit for governance</h2>
+                </div>
+                <span class="notation-pill">No customer funds move</span>
               </header>
-              <p class="text-xs text-text-muted">
-                Assemble, sign, and submit the publish bundle from this DRAFT, the pinned protocol
-                context, and the proposer EVM wallet's Eip712Member leaf.
+              <p class="text-sm text-text-muted">
+                Your wallet confirms the property and the exact SmartDeed terms. The protocol
+                then opens the standard SGT vote. This does not publish the SmartDeed by itself.
               </p>
-
-              @if (canonicalPreview(); as c) {
-                <div class="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <div class="form-label">property_id_canon</div>
-                    <div class="mono text-xs break-all">{{ c.propertyIdCanon }}</div>
-                  </div>
-                  <div>
-                    <div class="form-label">par_value_mojos</div>
-                    <div class="mono text-xs break-all">{{ c.parValueMojos }}</div>
-                  </div>
-                  <div>
-                    <div class="form-label">asset_class_code</div>
-                    <div class="mono text-xs break-all">{{ c.assetClassCode }}</div>
-                  </div>
-                  <div>
-                    <div class="form-label">property_registry_puzzle_hash</div>
-                    <div class="mono text-xs break-all">{{ c.propertyRegistryPuzzleHash }}</div>
-                  </div>
-                </div>
-                @if (c.error) {
-                  <div
-                    class="rounded-card border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200"
-                  >
-                    <div class="font-display text-sm mb-1">Canonical mapping failed.</div>
-                    <div class="mono">{{ c.error }}</div>
-                  </div>
-                }
-              }
-
-              <div class="grid gap-3 sm:grid-cols-2">
-                <div class="grid gap-1 sm:col-span-2">
-                  <span class="form-label">owner_member_hash</span>
-                  <input
-                    type="text"
-                    class="input mono text-xs"
-                    autocomplete="off"
-                    spellcheck="false"
-                    readonly
-                    [value]="ownerMemberHashInput()"
-                  />
-                  <div class="flex flex-wrap items-center gap-3">
-                    <button
-                      class="btn btn--ghost"
-                      type="button"
-                      (click)="deriveOwnerMemberHash()"
-                      [disabled]="ownerMemberHashBusy() || publishBusy()"
-                    >
-                      @if (ownerMemberHashBusy()) {
-                        Deriving&hellip;
-                      } @else {
-                        Derive from wallet
-                      }
-                    </button>
-                    @if (ownerMemberAddress(); as addr) {
-                      <span class="mono text-xs text-text-muted break-all">
-                        {{ addr }}
-                      </span>
-                    }
-                  </div>
-                  @if (ownerMemberPubkey(); as pubkey) {
-                    <div class="mono text-[0.65rem] text-text-muted break-all">
-                      {{ pubkey }}
-                    </div>
-                  }
-                </div>
-                <label class="grid gap-1">
-                  <span class="form-label">
-                    firstVoteAmount (default {{ defaultFirstVote() }})
-                  </span>
-                  <input
-                    type="text"
-                    inputmode="numeric"
-                    class="input mono"
-                    autocomplete="off"
-                    placeholder="leave blank for default"
-                    [value]="firstVoteAmountInput()"
-                    (input)="firstVoteAmountInput.set($any($event.target).value)"
-                  />
-                </label>
-                <label class="grid gap-1">
-                  <span class="form-label">
-                    votingWindowSeconds (default {{ defaultVotingWindow() }})
-                  </span>
-                  <input
-                    type="text"
-                    inputmode="numeric"
-                    class="input mono"
-                    autocomplete="off"
-                    placeholder="leave blank for default"
-                    [value]="votingWindowSecondsInput()"
-                    (input)="votingWindowSecondsInput.set($any($event.target).value)"
-                  />
-                </label>
-              </div>
+              <dl class="decision-receipt">
+                <div><dt>Purpose</dt><dd>Open the governed SmartDeed proposal</dd></div>
+                <div><dt>Network</dt><dd>{{ networkLabel }}</dd></div>
+                <div><dt>Financial effect</dt><dd>No customer payment or administrator transfer</dd></div>
+                <div><dt>Next safeguard</dt><dd>SGT approval is required before execution</dd></div>
+              </dl>
 
               <div class="flex flex-wrap gap-3 justify-end">
-                <button class="btn btn--ghost" type="button" (click)="preview()">
-                  Preview publish args
-                </button>
                 <button
                   class="btn btn--primary"
                   type="button"
-                  (click)="publish()"
+                  (click)="reviewAndPublish()"
                   [disabled]="publishBusy() || ownerMemberHashBusy() || !!canonicalPreview()?.error"
                 >
-                  @if (publishBusy()) {
-                    Publishing&hellip;
+                  @if (publishBusy() || ownerMemberHashBusy()) {
+                    Preparing secure request&hellip;
                   } @else {
-                    Publish
+                    Review in wallet
                   }
                 </button>
               </div>
@@ -446,54 +350,16 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
                 </div>
               }
 
-              @if (previewResult(); as r) {
-                @switch (r.kind) {
-                  @case ('missing-protocol-context') {
-                    <div
-                      class="rounded-card border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200"
-                    >
-                      <div class="font-display text-sm mb-1">Protocol context not configured.</div>
-                      <div>
-                        Mirror these <code class="mono">SOLSLOT_*</code> API env vars into
-                        <code class="mono">environment.solslotProtocol</code>
-                        and redeploy:
-                      </div>
-                      <ul class="mt-1 list-disc list-inside mono">
-                        @for (f of r.missing; track f) {
-                          <li>{{ f }}</li>
-                        }
-                      </ul>
-                    </div>
-                  }
-                  @case ('invalid-input') {
-                    <div
-                      class="rounded-card border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300"
-                    >
-                      <div class="font-display text-sm mb-1">Invalid input.</div>
-                      <div class="mono">{{ r.reason }}</div>
-                    </div>
-                  }
-                  @case ('ok') {
-                    <div
-                      class="rounded-card border border-emerald-500/40 bg-emerald-500/10 p-3 text-xs text-emerald-200"
-                    >
-                      <div class="font-display text-sm mb-2">Args assembled.</div>
-                      <pre class="mono text-[0.7rem] whitespace-pre-wrap break-all">{{
-                        formatArgs(r.args)
-                      }}</pre>
-                    </div>
-                  }
-                }
-              }
-
               @if (publishResult(); as pr) {
                 <div class="rounded-card border p-3 text-xs" [ngClass]="publishResultClass(pr)">
                   <div class="font-display text-sm mb-2">
                     {{ publishResultTitle(pr) }}
                   </div>
-                  <pre class="mono text-[0.7rem] whitespace-pre-wrap break-all">{{
-                    formatArgs(pr)
-                  }}</pre>
+                  <span>{{ publishResultHelp(pr) }}</span>
+                  <details class="technical-details">
+                    <summary>Technical receipt</summary>
+                    <pre class="mono text-[0.7rem] whitespace-pre-wrap break-all">{{ formatArgs(pr) }}</pre>
+                  </details>
                 </div>
               }
             </section>
@@ -515,12 +381,11 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
               </button>
             }
             @if (canExecute()) {
-              <div class="w-full rounded-card border border-cyan-400/30 bg-cyan-400/10 p-3 text-xs text-cyan-100">
-                <div class="font-display text-sm mb-1">Artifact-bound MINT co-signature</div>
+              <div class="w-full rounded-card border border-cyan-400/30 bg-cyan-400/10 p-4 text-sm text-cyan-100">
+                <div class="font-display text-base mb-1">Complete the approved SmartDeed</div>
                 <p>
-                  Your wallet signs the canonical five-spend execution bundle. The coordinator can
-                  attach one additional signature only for this verified governance MINT condition;
-                  it cannot sign a transfer, vote, or any other protocol action.
+                  Continue only after the governance result above shows approval. Your wallet signs
+                  this SmartDeed action only; it does not authorize a payment or wallet transfer.
                 </p>
                 <div class="mt-3 flex justify-end">
                   <button
@@ -530,9 +395,9 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
                     [disabled]="executeBusy()"
                   >
                     @if (executeBusy()) {
-                      Executing&hellip;
+                      Confirming&hellip;
                     } @else {
-                      Execute
+                      Review final action
                     }
                   </button>
                 </div>
@@ -572,6 +437,51 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
         letter-spacing: 0.18em;
         color: var(--muted);
         margin-bottom: 0.35rem;
+      }
+
+      .decision-receipt {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1px;
+        margin: 0;
+        border: 1px solid var(--border);
+        background: var(--border);
+      }
+      .decision-receipt div {
+        min-width: 0;
+        padding: 0.85rem;
+        background: var(--bg-2);
+      }
+      .decision-receipt dt {
+        color: var(--muted);
+        font: 0.65rem var(--font-mono);
+        text-transform: uppercase;
+      }
+      .decision-receipt dd {
+        margin: 0.3rem 0 0;
+        font-size: 0.78rem;
+      }
+      .technical-details {
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border);
+      }
+      .technical-details summary {
+        color: var(--muted);
+        font: 0.68rem var(--font-mono);
+        cursor: pointer;
+      }
+      .technical-details dl,
+      .technical-details pre {
+        margin-top: 0.75rem;
+      }
+      .technical-archive > summary {
+        color: var(--muted);
+        font: 0.72rem var(--font-mono);
+        cursor: pointer;
+      }
+      .technical-archive[open] > summary {
+        margin-bottom: 1rem;
+        color: var(--text);
       }
 
       .state-pill {
@@ -640,6 +550,11 @@ const ZERO_PROPERTY_REGISTRY_PUZZLE_HASH = '0x' + '0'.repeat(64);
         color: rgba(255, 120, 120, 0.95);
         background: rgba(255, 120, 120, 0.12);
       }
+      @media (max-width: 620px) {
+        .decision-receipt {
+          grid-template-columns: 1fr;
+        }
+      }
     `,
   ],
 })
@@ -657,6 +572,7 @@ export class MintDetailComponent {
   private readonly route = inject(ActivatedRoute);
 
   readonly proposalId = signal<string>(this.route.snapshot.paramMap.get('id') ?? '');
+  readonly networkLabel = environment.chiaNetwork;
   readonly proposal = signal<MintProposalResponse | null>(null);
   readonly loading = signal(false);
   readonly busy = signal(false);
@@ -845,6 +761,14 @@ export class MintDetailComponent {
     }
   }
 
+  async reviewAndPublish(): Promise<void> {
+    if (!this.ownerMemberHashInput()) {
+      await this.deriveOwnerMemberHash();
+    }
+    if (!this.ownerMemberHashInput() || this.previewError()) return;
+    await this.publish();
+  }
+
   /** Call the pure assembler and surface the discriminated result. */
   async preview(): Promise<void> {
     await this.assembleCurrentPublishArgs();
@@ -897,6 +821,16 @@ export class MintDetailComponent {
         : 'Publish returned a chain rejection.';
     }
     return `Publish stopped: ${result.kind}.`;
+  }
+
+  publishResultHelp(result: PublishRunResult): string {
+    if (result.kind === 'submitted' && result.apiResponse.pushed) {
+      return 'The proposal is in the network. Solslot will continue tracking governance and confirmation.';
+    }
+    if (result.kind === 'submitted') {
+      return 'The network did not accept the request. No proposal was opened.';
+    }
+    return 'The safety checks stopped this request before submission.';
   }
 
   publishResultClass(result: PublishRunResult): string {

@@ -36,6 +36,7 @@ const status: OwnershipActivationStatus = {
   approvals: [],
   broadcastTransaction: null,
   broadcast: null,
+  submission: null,
 };
 
 describe('OmnichainOwnershipActivationService', () => {

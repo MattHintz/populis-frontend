@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { AdminWorkspaceNavComponent } from '../../../components/admin-workspace/admin-workspace-nav.component';
 import {
   AdminOperationApproval,
   AdminOperationApprovalService,
@@ -31,18 +32,15 @@ interface DeskTask {
 @Component({
   selector: 'pp-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, AdminWorkspaceNavComponent],
   template: `
+    <solslot-admin-workspace-nav />
     <main class="operations-desk">
       <header class="desk-header">
         <div>
-          <span class="eyebrow">Solslot administrator operations</span>
-          <h1>Alpha operations</h1>
-          <p>One place for assigned work, collections, approvals, sales, and system readiness.</p>
-        </div>
-        <div class="identity">
-          <span>{{ shortWallet(subject() || '') }}</span>
-          <button type="button" (click)="logout()">Sign out</button>
+          <span class="eyebrow">Administrator home</span>
+          <h1>What needs attention</h1>
+          <p>Start with the next assigned action. Everything else can wait.</p>
         </div>
       </header>
 
@@ -54,11 +52,49 @@ interface DeskTask {
         </div>
       }
 
+      <section class="next-action" aria-labelledby="next-action-title">
+        @if (loading()) {
+          <div>
+            <span class="eyebrow">Next action</span>
+            <h2 id="next-action-title">Checking your assignments...</h2>
+          </div>
+        } @else if (primaryTask(); as task) {
+          <div>
+            <span class="eyebrow">Next action</span>
+            <h2 id="next-action-title">{{ task.title }}</h2>
+            <p>{{ task.body }}</p>
+          </div>
+          <a [routerLink]="task.route">{{ task.label }}</a>
+        } @else {
+          <div>
+            <span class="eyebrow">Up to date</span>
+            <h2 id="next-action-title">No administrator action is waiting</h2>
+            <p>You can continue preparing a property collection or review system readiness.</p>
+          </div>
+          <a routerLink="/admin/collections">Open collections</a>
+        }
+      </section>
+
+      <aside class="safety-reminder">
+        <strong>Safe signing</strong>
+        <span>
+          Read the decision receipt, match the network and financial effect in your wallet,
+          and reject any request that asks for a recovery phrase or unexpected approval.
+        </span>
+        <details>
+          <summary>More security guidance</summary>
+          <p>
+            Administrator sign-in is only a signature. Transactions appear only after a clear
+            review screen shows what will change and which approvals are required.
+          </p>
+        </details>
+      </aside>
+
       <section class="task-panel" aria-labelledby="tasks-title">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">Your work</span>
-            <h2 id="tasks-title">Task inbox</h2>
+            <span class="eyebrow">All assigned work</span>
+            <h2 id="tasks-title">Task list</h2>
           </div>
           <button type="button" class="icon-button" title="Refresh tasks" (click)="reload()">
             <span aria-hidden="true">&#8635;</span>
@@ -92,9 +128,9 @@ interface DeskTask {
 
       <section class="desk-grid" aria-label="Administrator work areas">
         <a routerLink="/admin/collections" class="desk-tile">
-          <span class="eyebrow">Issuance</span>
+          <span class="eyebrow">Properties</span>
           <strong>Collections</strong>
-          <p>Draft, review, seal, govern, and publish investor dossiers and SmartDeeds.</p>
+          <p>Prepare property information, documents, ownership plans, and SmartDeeds.</p>
           <dl>
             <div><dt>Total</dt><dd>{{ collections().length }}</dd></div>
             <div><dt>Need attention</dt><dd>{{ collectionAttentionCount() }}</dd></div>
@@ -102,9 +138,9 @@ interface DeskTask {
         </a>
 
         <a routerLink="/admin/approvals" class="desk-tile">
-          <span class="eyebrow">Owner plus one</span>
+          <span class="eyebrow">Independent review</span>
           <strong>Approvals</strong>
-          <p>Review consequential operations from every admin workflow in one inbox.</p>
+          <p>Approve important actions only after reviewing the complete decision receipt.</p>
           <dl>
             <div><dt>Open</dt><dd>{{ approvals().length }}</dd></div>
             <div><dt>Ready</dt><dd>{{ readyApprovalCount() }}</dd></div>
@@ -112,9 +148,9 @@ interface DeskTask {
         </a>
 
         <a routerLink="/admin/sales" class="desk-tile">
-          <span class="eyebrow">Customer fulfillment</span>
+          <span class="eyebrow">Customers</span>
           <strong>Sales & refunds</strong>
-          <p>Track refundable vouchers, SmartDeed delivery, settlement, and exact refunds.</p>
+          <p>Follow reservations through SmartDeed delivery or an exact refund.</p>
           <dl>
             <div><dt>Vouchers</dt><dd>{{ voucherCount() }}</dd></div>
             <div><dt>Need action</dt><dd>{{ voucherAttentionCount() }}</dd></div>
@@ -124,7 +160,7 @@ interface DeskTask {
         <a routerLink="/admin/sols-liquidity" class="desk-tile">
           <span class="eyebrow">Secondary market</span>
           <strong>SOLS liquidity</strong>
-          <p>Review the live SOLS pool, SmartDeeds available for swap, reserves, and governed NAV.</p>
+          <p>See available swaps, reserves, governed values, and approved venues.</p>
           <dl>
             <div><dt>Customer view</dt><dd>{{ solsMarket()?.outcome || 'Checking' }}</dd></div>
             <div><dt>Verified swaps</dt><dd>{{ solsMarket()?.verifiedOpportunityCount || 0 }}</dd></div>
@@ -132,9 +168,9 @@ interface DeskTask {
         </a>
 
         <a routerLink="/admin/system-health" class="desk-tile">
-          <span class="eyebrow">Readiness</span>
+          <span class="eyebrow">Safety</span>
           <strong>System health</strong>
-          <p>See release, node, rail, SOLS pool, media, and write-gate outcomes in ordinary language.</p>
+          <p>See what is working, waiting, or blocked and what customers can safely do.</p>
           <dl>
             <div><dt>Drafting</dt><dd>{{ feature()?.metadataEnabled ? 'Available' : 'Locked' }}</dd></div>
             <div><dt>Minting</dt><dd>{{ feature()?.mintingEnabled ? 'Open' : 'Closed' }}</dd></div>
@@ -144,14 +180,14 @@ interface DeskTask {
         <a routerLink="/admin/authority" class="desk-tile">
           <span class="eyebrow">Team</span>
           <strong>Administrators</strong>
-          <p>Review the active on-chain authority and administrator roster.</p>
-          <span class="tile-action">Open authority</span>
+          <p>Review active administrator roles, approval rules, and key-safety guidance.</p>
+          <span class="tile-action">Open team</span>
         </a>
 
         <a routerLink="/admin/genesis" class="desk-tile">
-          <span class="eyebrow">Read only after launch</span>
+          <span class="eyebrow">Protocol launch</span>
           <strong>Launch archive</strong>
-          <p>Review the signed RC21 ceremony, confirmations, evidence, and checksums.</p>
+          <p>Continue the guided launch or review its signed record after completion.</p>
           <span class="tile-action">Open archive</span>
         </a>
       </section>
@@ -191,14 +227,20 @@ interface DeskTask {
   styles: [
     `
       :host { display:block; min-height:100vh; background:#06110f; color:#eefbf5; }
-      .operations-desk { width:min(1220px,calc(100% - 32px)); margin:0 auto; padding:0 0 80px; }
-      .desk-header,.section-heading,.identity,.task-list article { display:flex; align-items:center; justify-content:space-between; gap:16px; }
-      .desk-header { align-items:flex-end; padding-bottom:23px; border-bottom:1px solid #245144; }
+      .operations-desk { width:min(1220px,calc(100% - 32px)); margin:0 auto; padding:34px 0 80px; }
+      .desk-header,.section-heading,.task-list article { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+      .desk-header { align-items:flex-end; padding-bottom:20px; border-bottom:1px solid #245144; }
       .eyebrow { color:#67e7ad; font:700 11px/1.2 monospace; text-transform:uppercase; }
       h1,h2 { letter-spacing:0; } h1 { margin:7px 0; font-size:36px; } h2 { margin:5px 0 0; font-size:22px; }
       p,small { color:#a9c2b8; } .desk-header p { max-width:680px; }
-      .identity { padding:8px 10px; border:1px solid #245144; font:11px monospace; }
-      .identity button,.notice button,.icon-button { border:0; background:none; color:#67e7ad; cursor:pointer; }
+      .notice button,.icon-button { border:0; background:none; color:#67e7ad; cursor:pointer; }
+      .next-action { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:24px; margin-top:20px; padding:22px; border:1px solid #3d7965; background:#0d251e; }
+      .next-action > div { display:grid; gap:5px; } .next-action p { margin:0; }
+      .next-action > a { padding:11px 15px; border:1px solid #67e7ad; background:#67e7ad; color:#04110d; font-weight:700; text-decoration:none; }
+      .safety-reminder { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:14px; align-items:start; margin-top:12px; padding:13px 15px; border-left:3px solid #7dc9ec; background:#091a1a; font-size:12px; }
+      .safety-reminder span,.safety-reminder p { color:#a9c2b8; }
+      .safety-reminder details { color:#8cd8ba; } .safety-reminder summary { cursor:pointer; white-space:nowrap; }
+      .safety-reminder p { max-width:680px; margin:8px 0 0; line-height:1.55; }
       .task-panel,.recent { margin-top:20px; padding:20px; border:1px solid #245144; background:#0a1a16; }
       .task-list { display:grid; gap:1px; margin-top:16px; background:#245144; }
       .task-list article { display:grid; grid-template-columns:auto minmax(0,1fr) auto; padding:14px; background:#081612; }
@@ -207,7 +249,7 @@ interface DeskTask {
       .task-state { min-width:56px; padding:4px 6px; border:1px solid #4f8d77; font:700 10px monospace; text-align:center; }
       .task-state--now { color:#ffd58a; border-color:#8c713e; } .task-state--review { color:#7cffb2; }
       .desk-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:20px; }
-      .desk-tile { display:flex; min-height:220px; flex-direction:column; padding:20px; border:1px solid #245144; background:#0a1a16; color:inherit; text-decoration:none; transition:background .15s,border-color .15s; }
+      .desk-tile { display:flex; min-height:190px; flex-direction:column; padding:18px; border:1px solid #245144; background:#0a1a16; color:inherit; text-decoration:none; transition:background .15s,border-color .15s; }
       .desk-tile:hover { border-color:#4f8d77; background:#0d211b; }
       .desk-tile > strong { margin-top:9px; font-size:21px; } .desk-tile p { min-height:58px; font-size:13px; }
       .desk-tile dl { display:grid; grid-template-columns:repeat(2,1fr); gap:1px; margin:auto 0 0; background:#245144; }
@@ -223,7 +265,7 @@ interface DeskTask {
       .notice { display:grid; grid-template-columns:auto 1fr auto; gap:12px; margin-top:18px; padding:12px; border:1px solid #844f4f; color:#ffc4c4; }
       .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
       @media (max-width:900px) { .desk-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-      @media (max-width:650px) { .desk-header { align-items:flex-start; flex-direction:column; } .desk-grid { grid-template-columns:1fr; } .task-list article,.collection-list > a { grid-template-columns:auto 1fr; } .task-list a,.collection-list time { grid-column:2; } .notice { grid-template-columns:1fr; } }
+      @media (max-width:650px) { .desk-header { align-items:flex-start; flex-direction:column; } .next-action { grid-template-columns:1fr; } .next-action > a { width:max-content; } .safety-reminder { grid-template-columns:1fr; } .safety-reminder summary { white-space:normal; } .desk-grid { grid-template-columns:1fr; } .task-list article,.collection-list > a { grid-template-columns:auto 1fr; } .task-list a,.collection-list time { grid-column:2; } .notice { grid-template-columns:1fr; } }
     `,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -322,6 +364,7 @@ export class AdminDashboardComponent {
     }
     return tasks.slice(0, 12);
   });
+  readonly primaryTask = computed(() => this.tasks()[0] ?? null);
 
   constructor() {
     void this.reload();
