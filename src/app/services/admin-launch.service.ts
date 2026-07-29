@@ -439,9 +439,21 @@ export type SettlementRehearsalState =
   | 'SUCCEEDED'
   | 'FAILED';
 
+export type SettlementRehearsalPhase =
+  | 'PREPARE'
+  | 'APPROVE_DELIVERY'
+  | 'PAY_DELIVERY'
+  | 'VERIFY_DELIVERY'
+  | 'APPROVE_REFUND'
+  | 'PAY_REFUND'
+  | 'VERIFY_REFUND'
+  | 'COMPLETE';
+
 export interface SettlementRehearsalStatus {
   jobId?: string | null;
   state: SettlementRehearsalState;
+  phase: SettlementRehearsalPhase;
+  completedSteps: number;
   step: string;
   message: string;
   assignedRole?: 'coadmin';

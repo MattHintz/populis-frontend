@@ -349,4 +349,36 @@ describe('GenesisComponent', () => {
       'only the approved genesis bundle',
     );
   });
+
+  it('moves the customer payment check after the signed launch archive', () => {
+    const beforeLaunch = workspace('roster_open');
+    beforeLaunch.readiness.push({
+      id: 'settlement',
+      title: 'Customer payment activation',
+      status: 'Waiting',
+      impact: 'This check follows protocol launch.',
+      assignedRole: 'coadmin',
+    });
+    component.workspace.set(beforeLaunch);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('Prove the payment path');
+
+    const launched = workspace('locked');
+    launched.readiness.push({
+      id: 'settlement',
+      title: 'Customer payment activation',
+      status: 'Needs action',
+      impact: 'Prove delivery and an exact refund before customer sales.',
+      assignedRole: 'coadmin',
+    });
+    component.workspace.set(launched);
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Prove the payment path');
+    expect(text).toContain('Send a test payment');
+    expect(text).toContain('Prove a full refund');
+    expect(text).toContain('Unlock sales controls');
+  });
 });
