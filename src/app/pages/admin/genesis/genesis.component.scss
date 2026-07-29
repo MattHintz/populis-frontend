@@ -450,6 +450,47 @@ pre {
   line-height: 1.5;
 }
 
+.payment-review {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--border);
+  border-top: 0;
+}
+
+.payment-review div {
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  border-right: 1px solid var(--border);
+}
+
+.payment-review div:last-child {
+  border-right: 0;
+}
+
+.payment-review dt {
+  color: var(--muted);
+  font: 700 0.62rem/1.2 var(--font-mono);
+  text-transform: uppercase;
+}
+
+.payment-review dd {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.technical-grid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.technical-grid dd {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+  font-size: 0.68rem;
+}
+
 .plain-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -571,9 +612,18 @@ td:last-child {
 }
 
 .wallet-review {
+  display: grid;
+  gap: 0.3rem;
   margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  border-left: 3px solid var(--accent);
+  background: rgba(124, 255, 178, 0.06);
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.wallet-review strong {
+  color: var(--text);
 }
 
 .sr-only {
@@ -694,6 +744,19 @@ td:last-child {
 
   .payment-checklist {
     grid-template-columns: 1fr;
+  }
+
+  .payment-review {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-review div {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .payment-review div:last-child {
+    border-bottom: 0;
   }
 
   .payment-checklist li {

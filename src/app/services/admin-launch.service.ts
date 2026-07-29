@@ -458,6 +458,17 @@ export interface SettlementRehearsalStatus {
   message: string;
   assignedRole?: 'coadmin';
   walletTransaction?: BaseSepoliaTransaction | null;
+  review?: {
+    action: 'approve' | 'pay' | 'verify';
+    lane: 'delivery' | 'refund';
+    asset: 'USDC';
+    amountMinor: string;
+    amountLabel: string;
+    escrow: string;
+    destinationVault: string;
+    deedLauncherId: string;
+    expectedOutcome: 'DELIVERED' | 'REFUND';
+  } | null;
   evidenceDigest?: string | null;
   updatedAt?: number | null;
 }

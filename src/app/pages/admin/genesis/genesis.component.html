@@ -547,6 +547,39 @@
                 }}
               </span>
             </div>
+            @if (settlementRehearsal()?.status?.review; as review) {
+              <dl class="payment-review" aria-label="Current payment test">
+                <div>
+                  <dt>Amount</dt>
+                  <dd>{{ review.amountLabel }}</dd>
+                </div>
+                <div>
+                  <dt>Expected</dt>
+                  <dd>{{ review.expectedOutcome === 'DELIVERED' ? 'Deed delivered' : 'Full refund' }}</dd>
+                </div>
+                <div>
+                  <dt>Network</dt>
+                  <dd>Base Sepolia</dd>
+                </div>
+              </dl>
+              <details>
+                <summary>Verify exact destination</summary>
+                <dl class="technical-grid">
+                  <div>
+                    <dt>Escrow</dt>
+                    <dd class="mono">{{ review.escrow }}</dd>
+                  </div>
+                  <div>
+                    <dt>Test vault</dt>
+                    <dd class="mono">{{ review.destinationVault }}</dd>
+                  </div>
+                  <div>
+                    <dt>Test deed</dt>
+                    <dd class="mono">{{ review.deedLauncherId }}</dd>
+                  </div>
+                </dl>
+              </details>
+            }
             <div class="inline-actions">
               <button
                 type="button"
@@ -765,10 +798,14 @@
           }
         </dl>
         @if (decision.kind === 'rehearsal-payment') {
-          <p class="wallet-review">
-            Your wallet will show one Base Sepolia test transaction. Confirm that its network and
-            effect match this receipt.
-          </p>
+          <div class="wallet-review">
+            <strong>Before you approve</strong>
+            <span>
+              Use only the enrolled admin wallet shown in your browser. Confirm Base Sepolia and
+              {{ decision.rehearsal.status.review?.amountLabel || 'the fixed test amount' }}.
+              Never share your recovery phrase or approve an unlimited amount.
+            </span>
+          </div>
         } @else {
           <p class="wallet-review">
             Your wallet will show a signature request for only this exact Testnet action.
