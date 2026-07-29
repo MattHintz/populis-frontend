@@ -144,7 +144,6 @@ export class GenesisComponent implements OnInit, OnDestroy {
   });
   readonly ownerSession = computed(() => this.workspace()?.session.role === 'owner');
   readonly coadminSession = computed(() => this.workspace()?.session.role === 'coadmin');
-  readonly launchSealed = computed(() => this.workspace()?.launch.state === 'locked');
   readonly customerPaymentsReady = computed(
     () => this.finding('settlement')?.status === 'Healthy',
   );
@@ -629,12 +628,12 @@ export class GenesisComponent implements OnInit, OnDestroy {
     if (status.state === 'SUCCEEDED') return 'Payment path ready';
     const labels: Record<string, string> = {
       PREPARE: 'Prepare payment check',
-      APPROVE_DELIVERY: 'Approve delivery-test USDC',
-      PAY_DELIVERY: 'Send delivery test',
-      VERIFY_DELIVERY: 'Check deed delivery',
-      APPROVE_REFUND: 'Approve refund-test USDC',
-      PAY_REFUND: 'Send refund test',
-      VERIFY_REFUND: 'Check exact refund',
+      APPROVE_DELIVERY: 'Approve test USDC',
+      PAY_DELIVERY: 'Send delivery payment',
+      VERIFY_DELIVERY: 'Refresh delivery status',
+      APPROVE_REFUND: 'Approve refund test',
+      PAY_REFUND: 'Send refund payment',
+      VERIFY_REFUND: 'Refresh refund status',
       COMPLETE: 'Payment path ready',
     };
     return labels[status.phase] ?? 'Check progress';

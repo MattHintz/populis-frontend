@@ -130,6 +130,7 @@
             <li
               [class.is-current]="index === currentStageIndex()"
               [class.is-complete]="index < currentStageIndex()"
+              [attr.aria-current]="index === currentStageIndex() ? 'step' : null"
             >
               <span class="stage-number">{{ index + 1 }}</span>
               <div>
@@ -499,36 +500,36 @@
               </span>
             </div>
             <p>
-              Use test USDC to prove both outcomes before any presale or purchase window can open.
-              This check cannot move real funds.
+              Complete one test delivery and one full refund before customer sales can open. Only
+              Base Sepolia test USDC is used.
             </p>
             <ol class="payment-checklist" aria-label="Customer payment activation steps">
               <li [class.is-complete]="rehearsalCompleted(1)">
                 <span>1</span>
                 <div>
-                  <strong>Test delivery</strong>
-                  <small>Send faucet USDC to the exact canary deed and approved test vault.</small>
+                  <strong>Send a test payment</strong>
+                  <small>Approve and send test USDC for one fixed SmartDeed.</small>
                 </div>
               </li>
               <li [class.is-complete]="rehearsalCompleted(2)">
                 <span>2</span>
                 <div>
-                  <strong>Confirm the deed</strong>
-                  <small>Wait while the validators confirm delivery to the selected vault.</small>
+                  <strong>Confirm delivery</strong>
+                  <small>The desk watches the test SmartDeed arrive in the approved vault.</small>
                 </div>
               </li>
               <li [class.is-complete]="rehearsalCompleted(3)">
                 <span>3</span>
                 <div>
-                  <strong>Test a refund</strong>
-                  <small>Run the second fixed payment and prove the full amount returns.</small>
+                  <strong>Prove a full refund</strong>
+                  <small>A second test payment must return to the same wallet in full.</small>
                 </div>
               </li>
               <li [class.is-complete]="rehearsalCompleted(4)">
                 <span>4</span>
                 <div>
-                  <strong>Ready for customers</strong>
-                  <small>Signed evidence unlocks presale and purchase window approvals.</small>
+                  <strong>Unlock sales controls</strong>
+                  <small>Presale and purchase windows can now be reviewed and approved.</small>
                 </div>
               </li>
             </ol>
@@ -763,9 +764,16 @@
             </div>
           }
         </dl>
-        <p class="wallet-review">
-          Your wallet will show a signature request for only this exact Testnet action.
-        </p>
+        @if (decision.kind === 'rehearsal-payment') {
+          <p class="wallet-review">
+            Your wallet will show one Base Sepolia test transaction. Confirm that its network and
+            effect match this receipt.
+          </p>
+        } @else {
+          <p class="wallet-review">
+            Your wallet will show a signature request for only this exact Testnet action.
+          </p>
+        }
         <div class="decision-actions">
           <button type="button" class="btn btn--ghost" (click)="cancelDecision()">Cancel</button>
           <button

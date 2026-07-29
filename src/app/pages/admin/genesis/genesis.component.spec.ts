@@ -377,8 +377,8 @@ describe('GenesisComponent', () => {
 
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Prove the payment path');
-    expect(text).toContain('Test delivery');
-    expect(text).toContain('Test a refund');
-    expect(text).toContain('Ready for customers');
+    expect(text).toContain('Send a test payment');
+    expect(text).toContain('Prove a full refund');
+    expect(text).toContain('Unlock sales controls');
   });
 });
