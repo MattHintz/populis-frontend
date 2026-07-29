@@ -622,6 +622,52 @@ export class GenesisComponent implements OnInit, OnDestroy {
     return this.railOwnership()?.status.approvals.filter((item) => item.signed).length ?? 0;
   }
 
+  railStepLabel(): string {
+    const status = this.railOwnership()?.status;
+    if (!status || status.phase === 'schedule') return 'Start the 24-hour safety delay';
+    if (status.state === 'WAITING_FOR_DELAY') return 'Safety delay in progress';
+    if (status.state === 'DONE') return 'Payment rail ready';
+    return 'Complete the handoff';
+  }
+
+  railStepHelp(): string {
+    const status = this.railOwnership()?.status;
+    if (!status || status.phase === 'schedule') {
+      return 'The owner and one coadministrator approve the fixed handoff. The wizard prepares the final step automatically.';
+    }
+    if (status.state === 'WAITING_FOR_DELAY') {
+      return 'No action is needed yet. This page keeps checking and will show the final approval when the delay ends.';
+    }
+    if (status.state === 'DONE') {
+      return 'The reviewed Safe and timelock now control the Base Sepolia payment rail.';
+    }
+    return 'The owner and one coadministrator give fresh approval, then either may submit the fixed final action.';
+  }
+
+  railDelayLabel(): string {
+    const status = this.railOwnership()?.status;
+    if (!status || status.phase === 'schedule') return 'Starts after submission';
+    if (status.state === 'WAITING_FOR_DELAY' && status.scheduledFor) {
+      return `Ends ${this.formatTime(status.scheduledFor)}`;
+    }
+    return status.scheduledFor ? 'Complete' : 'Checking';
+  }
+
+  railActionLabel(): string {
+    const rail = this.railOwnership();
+    if (!rail) return 'Check readiness';
+    const approval = this.currentRailApproval(rail);
+    if (approval && !approval.signed) return 'Review and approve';
+    if (rail.status.broadcastTransaction) return 'Review and submit';
+    if (
+      ['SCHEDULED', 'WAITING_FOR_SCHEDULE', 'WAITING_FOR_DELAY', 'BROADCAST_PENDING', 'CONFIRMING']
+        .includes(rail.status.state)
+    ) {
+      return 'Check now';
+    }
+    return 'Continue handoff';
+  }
+
   railStateLabel(): string {
     const state = this.railOwnership()?.status.state;
     const labels: Record<string, string> = {

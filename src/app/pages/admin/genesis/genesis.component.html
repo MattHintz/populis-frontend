@@ -296,7 +296,7 @@
           <div class="section-heading">
             <div>
               <span class="eyebrow">Payment rail</span>
-              <h2>Base Sepolia ownership</h2>
+              <h2>Payment rail handoff</h2>
             </div>
             <span
               [class]="
@@ -310,23 +310,14 @@
           </div>
           <p>{{ finding('railOwnership')?.impact }}</p>
           <div class="operation-callout">
-            <strong>
-              {{
-                railOwnership()?.status?.phase === 'execute'
-                  ? 'Final acceptance'
-                  : 'Schedule ownership'
-              }}
-            </strong>
-            <span>
-              Scheduling and execution use fresh owner-plus-one approvals. Contract addresses and
-              calldata stay in technical evidence.
-            </span>
+            <strong>{{ railStepLabel() }}</strong>
+            <span>{{ railStepHelp() }}</span>
           </div>
           @if (railOwnership(); as rail) {
             <dl class="plain-summary plain-summary--three">
               <div>
                 <dt>Step</dt>
-                <dd>{{ rail.status.phase === 'schedule' ? 'Schedule' : 'Execute' }}</dd>
+                <dd>{{ rail.status.phase === 'schedule' ? 'Start safety delay' : 'Final acceptance' }}</dd>
               </div>
               <div>
                 <dt>Approvals</dt>
@@ -334,13 +325,7 @@
               </div>
               <div>
                 <dt>Safety delay</dt>
-                <dd>
-                  {{
-                    rail.status.scheduledFor
-                      ? formatTime(rail.status.scheduledFor)
-                      : 'Begins after scheduling'
-                  }}
-                </dd>
+                <dd>{{ railDelayLabel() }}</dd>
               </div>
             </dl>
             @if (rail.status.submission; as submission) {
@@ -362,11 +347,7 @@
               (click)="advanceRailOwnership()"
             >
               {{
-                currentRailApproval() && !currentRailApproval()?.signed
-                  ? 'Review and approve'
-                  : railOwnership()?.status?.broadcastTransaction
-                    ? 'Review and submit'
-                    : 'Refresh rail status'
+                railActionLabel()
               }}
             </button>
           </div>
