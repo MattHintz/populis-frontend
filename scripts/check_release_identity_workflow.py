@@ -18,6 +18,8 @@ COMMON_REQUIRED = (
     'release_id="${{ inputs.rollback_release }}"',
     'sha="${release_id%%-*}"',
     'tag="${release_id#"$sha"-}"',
+    "--retry 12 --retry-delay 2 --retry-all-errors",
+    '[ "$previous" != "$release_dir" ]',
 )
 
 COMMON_FORBIDDEN = (
