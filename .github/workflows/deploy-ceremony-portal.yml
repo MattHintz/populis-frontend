@@ -240,7 +240,8 @@ jobs:
             verify_host="${verify_host%%/*}"
             verify_url="https://$verify_host/genesis-admin/release.json"
             curl_args=(--resolve "$verify_host:443:127.0.0.1")
-            if ! curl -fsS "${curl_args[@]}" "$verify_url" \
+            if ! curl -fsS --retry 12 --retry-delay 2 --retry-all-errors \
+              --max-time 90 "${curl_args[@]}" "$verify_url" \
               | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["commit"] == "${{ inputs.release_sha }}"; assert d["release"] == "${{ inputs.release_tag }}"'; then
               if [ -n "$previous" ] && [ -f "$previous/.release-verified" ]; then
                 sudo ln -sfn "$previous" "$root/current.next"
@@ -289,6 +290,7 @@ jobs:
             assert release["mintingExpectedLocked"] is True
             assert release["ceremonyModeExpectedLocked"] is True
             PY
+            previous="$(readlink -f "$root/current" || true)"
             sudo ln -sfn "$release_dir" "$root/current.next"
             sudo mv -Tf "$root/current.next" "$root/current"
             test -d "$(dirname "$mount_path")"
@@ -304,5 +306,15 @@ jobs:
             verify_host="${verify_host%%/*}"
             verify_url="https://$verify_host/genesis-admin/release.json"
             curl_args=(--resolve "$verify_host:443:127.0.0.1")
-            curl -fsS "${curl_args[@]}" "$verify_url" \
-              | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["commit"] == "'"$sha"'"; assert d["release"] == "'"$tag"'"'
+            if ! curl -fsS --retry 12 --retry-delay 2 --retry-all-errors \
+              --max-time 90 "${curl_args[@]}" "$verify_url" \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["commit"] == "'"$sha"'"; assert d["release"] == "'"$tag"'"'; then
+              if [ -n "$previous" ] \
+                && [ "$previous" != "$release_dir" ] \
+                && [ -f "$previous/.release-verified" ]; then
+                sudo ln -sfn "$previous" "$root/current.next"
+                sudo mv -Tf "$root/current.next" "$root/current"
+                sudo systemctl reload apache2
+              fi
+              exit 1
+            fi
