@@ -36,7 +36,7 @@ describe('AdminWorkspaceNavComponent', () => {
     expect(text).toContain('Approvals');
     expect(text).toContain('Sales');
     expect(text).toContain('Health');
-    expect(text).toContain('Team');
+    expect(text).toContain('Security');
   });
 
   it('signs out through the shared administrator session', () => {
@@ -52,7 +52,7 @@ describe('AdminWorkspaceNavComponent', () => {
     expect(text).toContain('Where should I start?');
     expect(text).toContain('Solslot will never ask for a recovery phrase or private key.');
     expect(text).toContain('Wallet lost or possibly compromised?');
-    expect(text).toContain('Open Team');
+    expect(text).toContain('Open Security & Access');
   });
 
   it('hands sign-out back to the launch wizard when requested', () => {

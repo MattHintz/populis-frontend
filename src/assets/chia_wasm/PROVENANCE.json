@@ -1,0 +1,23 @@
+{
+  "schema": "solslot.eip712-wasm-provenance.v1",
+  "purpose": "EIP-712 clear-signing bindings only",
+  "sourceRepository": "https://github.com/MattHintz/chia-wallet-sdk",
+  "sourceBranch": "solslot-wasm-crackpack",
+  "sourceCommit": "af8a21a1c9370aa6873ca267bddebd22e500957e",
+  "package": "chia-wallet-sdk-wasm",
+  "version": "0.33.0",
+  "license": "Apache-2.0",
+  "wasmSha256": "89ed323a034df2f074f637314d1b1c727113dc6100568d94d722fcdce45cdf48",
+  "requiredExports": [
+    "eip712TypeHash",
+    "eip712DomainSeparator",
+    "eip712HashToSign",
+    "eip712MemberInnerPuzzleHash",
+    "eip712MemberHash"
+  ],
+  "recoveryAuthority": false,
+  "upstreamRecoverySdk": {
+    "repository": "https://github.com/Chia-Network/cni-wallet-sdk",
+    "commit": "fb8f4ea8279709287b022d6c388aef4751765d4c"
+  }
+}

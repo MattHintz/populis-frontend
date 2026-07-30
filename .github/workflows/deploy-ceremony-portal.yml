@@ -85,7 +85,10 @@ jobs:
           out="dist/solslot-portal/browser"
           test -f "$out/index.html"
           runtime_config_sha256="$(sha256sum src/environments/google-vault-runtime.ts | awk '{print $1}')"
-          RUNTIME_CONFIG_SHA256="$runtime_config_sha256" node - "$out/release.json" <<'NODE'
+          recovery_manifest_sha256="$(node scripts/write-recovery-page-manifest.mjs "$out")"
+          RUNTIME_CONFIG_SHA256="$runtime_config_sha256" \
+          RECOVERY_MANIFEST_SHA256="$recovery_manifest_sha256" \
+          node - "$out/release.json" <<'NODE'
           const fs = require("fs");
           const output = process.argv[2];
           fs.writeFileSync(output, JSON.stringify({
@@ -101,7 +104,8 @@ jobs:
             mintingExpectedLocked: true,
             ceremonyModeExpectedLocked: true,
             googleVaultEnabled: process.env.SOLSLOT_GOOGLE_VAULT_ENABLED === "true",
-            googleVaultRuntimeConfigSha256: process.env.RUNTIME_CONFIG_SHA256
+            googleVaultRuntimeConfigSha256: process.env.RUNTIME_CONFIG_SHA256,
+            recoveryPageManifestSha256: process.env.RECOVERY_MANIFEST_SHA256
           }, null, 2) + "\n");
           NODE
           node scripts/render-apache-headers.mjs --output "$out/.htaccess" --base-href /genesis-admin/
@@ -182,6 +186,11 @@ jobs:
             assert release["serverWritesExpectedLocked"] is True
             assert release["mintingExpectedLocked"] is True
             assert release["ceremonyModeExpectedLocked"] is True
+            recovery = json.load(open(
+                str(sys.argv[1]).replace("release.json", "recovery-page-manifest.json"),
+                encoding="utf-8",
+            ))
+            assert release["recoveryPageManifestSha256"] == recovery["aggregateSha256"]
             PY
               sudo touch "$release_dir/.release-ready"
             fi

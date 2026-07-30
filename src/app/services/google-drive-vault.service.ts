@@ -13,7 +13,11 @@ const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const BACKUP_FILE_NAME = 'solslot_vault_backup_v1.json';
+export const ADMIN_RECOVERY_BACKUP_FILE_NAME = 'solslot_admin_recovery_v1.json';
 const MULTIPART_BOUNDARY_PREFIX = 'solslot-google-vault-';
+export type SolslotAppDataFileName =
+  | typeof BACKUP_FILE_NAME
+  | typeof ADMIN_RECOVERY_BACKUP_FILE_NAME;
 
 @Injectable({ providedIn: 'root' })
 export class GoogleDriveVaultService {
@@ -76,26 +80,11 @@ export class GoogleDriveVaultService {
   }
 
   async loadBackup(): Promise<SolslotVaultBackupEnvelope | null> {
-    await this.authorize();
-    const files = await this.findBackupFiles();
-    if (files.length === 0) return null;
-    if (files.length > 1) {
-      throw new GoogleDriveVaultError(
-        'duplicate_backup',
-        'Multiple SolSlot vault backups were found in this Google account.',
-      );
-    }
-    const file = files[0];
-    if (file.size === undefined || file.size > GOOGLE_VAULT_MAX_BACKUP_BYTES) {
-      throw new GoogleDriveVaultError('backup_too_large', 'The Google Drive backup exceeds the 16 KiB limit.');
-    }
-    const response = await this.request(`${DRIVE_FILES_URL}/${encodeURIComponent(file.id)}?alt=media`);
-    let value: unknown;
-    try {
-      value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await boundedResponseBytes(response)));
-    } catch {
-      throw new GoogleDriveVaultError('invalid_backup', 'The Google Drive backup is invalid.');
-    }
+    const value = await this.loadAppDataDocument(
+      BACKUP_FILE_NAME,
+      GOOGLE_VAULT_MAX_BACKUP_BYTES,
+    );
+    if (value === null) return null;
     try {
       return this.crypto.parse(value);
     } catch {
@@ -104,30 +93,88 @@ export class GoogleDriveVaultService {
   }
 
   async createBackup(envelope: SolslotVaultBackupEnvelope): Promise<void> {
-    await this.authorize();
-    if ((await this.findBackupFiles()).length !== 0) {
-      throw new GoogleDriveVaultError(
-        'backup_exists',
-        'A SolSlot vault backup already exists in this Google account.',
-      );
-    }
-    const uploaded = await this.upload(envelope, null);
-    await this.verifyUploadedBackup(uploaded.id, envelope);
+    await this.createAppDataDocument(
+      BACKUP_FILE_NAME,
+      envelope,
+      GOOGLE_VAULT_MAX_BACKUP_BYTES,
+    );
   }
 
   async replaceBackup(envelope: SolslotVaultBackupEnvelope): Promise<void> {
+    await this.replaceAppDataDocument(
+      BACKUP_FILE_NAME,
+      envelope,
+      GOOGLE_VAULT_MAX_BACKUP_BYTES,
+    );
+  }
+
+  async loadAppDataDocument(
+    fileName: SolslotAppDataFileName,
+    maxBytes: number,
+  ): Promise<unknown | null> {
     await this.authorize();
-    const files = await this.findBackupFiles();
+    const files = await this.findBackupFiles(fileName);
+    if (files.length === 0) return null;
+    if (files.length > 1) {
+      throw new GoogleDriveVaultError(
+        'duplicate_backup',
+        'Multiple Solslot backups of this type were found in this Google account.',
+      );
+    }
+    const file = files[0];
+    if (file.size === undefined || Number(file.size) > maxBytes) {
+      throw new GoogleDriveVaultError(
+        'backup_too_large',
+        'The Google Drive backup exceeds the 16 KiB limit.',
+      );
+    }
+    const response = await this.request(
+      `${DRIVE_FILES_URL}/${encodeURIComponent(file.id)}?alt=media`,
+    );
+    try {
+      return JSON.parse(
+        new TextDecoder('utf-8', { fatal: true }).decode(
+          await boundedResponseBytes(response, maxBytes),
+        ),
+      );
+    } catch {
+      throw new GoogleDriveVaultError('invalid_backup', 'The Google Drive backup is invalid.');
+    }
+  }
+
+  async createAppDataDocument(
+    fileName: SolslotAppDataFileName,
+    value: unknown,
+    maxBytes: number,
+  ): Promise<void> {
+    await this.authorize();
+    if ((await this.findBackupFiles(fileName)).length !== 0) {
+      throw new GoogleDriveVaultError(
+        'backup_exists',
+        'A Solslot backup of this type already exists in this Google account.',
+      );
+    }
+    const uploaded = await this.upload(fileName, value, null, maxBytes);
+    await this.verifyUploadedBackup(uploaded.id, value, maxBytes);
+  }
+
+  async replaceAppDataDocument(
+    fileName: SolslotAppDataFileName,
+    value: unknown,
+    maxBytes: number,
+  ): Promise<void> {
+    await this.authorize();
+    const files = await this.findBackupFiles(fileName);
     if (files.length !== 1) {
       throw new GoogleDriveVaultError(
         files.length === 0 ? 'backup_missing' : 'duplicate_backup',
         files.length === 0
-          ? 'No SolSlot vault backup exists in this Google account.'
-          : 'Multiple SolSlot vault backups were found in this Google account.',
+          ? 'No Solslot backup of this type exists in this Google account.'
+          : 'Multiple Solslot backups of this type were found in this Google account.',
       );
     }
-    const uploaded = await this.upload(envelope, files[0].id);
-    await this.verifyUploadedBackup(uploaded.id, envelope);
+    const uploaded = await this.upload(fileName, value, files[0].id, maxBytes);
+    await this.verifyUploadedBackup(uploaded.id, value, maxBytes);
   }
 
   /** Clears page-memory authorization without changing the user's Google grant. */
@@ -166,10 +213,10 @@ export class GoogleDriveVaultService {
     this.connected.set(false);
   }
 
-  private async findBackupFiles(): Promise<DriveFile[]> {
+  private async findBackupFiles(fileName: SolslotAppDataFileName): Promise<DriveFile[]> {
     const params = new URLSearchParams({
       spaces: 'appDataFolder',
-      q: `name = '${BACKUP_FILE_NAME}' and trashed = false`,
+      q: `name = '${fileName}' and trashed = false`,
       fields: 'files(id,name,modifiedTime,size)',
       pageSize: '10',
     });
@@ -178,17 +225,29 @@ export class GoogleDriveVaultService {
     if (!Array.isArray(value.files)) {
       throw new GoogleDriveVaultError('drive_failed', 'Google Drive returned an invalid response.');
     }
-    return value.files.filter(isDriveFile);
+    return value.files.filter((file) => isDriveFile(file, fileName));
   }
 
-  private async upload(envelope: SolslotVaultBackupEnvelope, fileId: string | null): Promise<DriveFile> {
+  private async upload(
+    fileName: SolslotAppDataFileName,
+    value: unknown,
+    fileId: string | null,
+    maxBytes: number,
+  ): Promise<DriveFile> {
+    const documentBytes = serializedDocumentBytes(value);
+    if (documentBytes.byteLength > maxBytes) {
+      throw new GoogleDriveVaultError(
+        'backup_too_large',
+        'The Google Drive backup exceeds the 16 KiB limit.',
+      );
+    }
     const body = relatedMultipartBody(
       fileId
-        ? { name: BACKUP_FILE_NAME, mimeType: 'application/json' }
-        : { name: BACKUP_FILE_NAME, mimeType: 'application/json', parents: ['appDataFolder'] },
-      envelope,
+        ? { name: fileName, mimeType: 'application/json' }
+        : { name: fileName, mimeType: 'application/json', parents: ['appDataFolder'] },
+      new TextDecoder().decode(documentBytes),
     );
-    if (body.bytes.byteLength > GOOGLE_VAULT_MAX_BACKUP_BYTES + 1024) {
+    if (body.bytes.byteLength > maxBytes + 1024) {
       throw new GoogleDriveVaultError('backup_too_large', 'The Google Drive backup exceeds the 16 KiB limit.');
     }
     const url = fileId
@@ -199,21 +258,26 @@ export class GoogleDriveVaultService {
       headers: { 'Content-Type': `multipart/related; boundary=${body.boundary}` },
       body: exactBuffer(body.bytes),
     });
-    const value = await response.json();
-    if (!isDriveFile(value)) {
+    const responseValue = await response.json();
+    if (!isDriveFile(responseValue, fileName)) {
       throw new GoogleDriveVaultError('drive_failed', 'Google Drive did not return the uploaded backup metadata.');
     }
-    return value;
+    return responseValue;
   }
 
-  private async verifyUploadedBackup(fileId: string, expected: SolslotVaultBackupEnvelope): Promise<void> {
+  private async verifyUploadedBackup(
+    fileId: string,
+    expected: unknown,
+    maxBytes: number,
+  ): Promise<void> {
     const response = await this.request(`${DRIVE_FILES_URL}/${encodeURIComponent(fileId)}?alt=media`);
     try {
       const value = JSON.parse(
-        new TextDecoder('utf-8', { fatal: true }).decode(await boundedResponseBytes(response)),
+        new TextDecoder('utf-8', { fatal: true }).decode(
+          await boundedResponseBytes(response, maxBytes),
+        ),
       );
-      const actual = this.crypto.parse(value);
-      if (!sameEnvelope(actual, expected)) throw new Error('mismatch');
+      if (!sameDocument(value, expected)) throw new Error('mismatch');
     } catch {
       throw new GoogleDriveVaultError(
         'verification_failed',
@@ -297,7 +361,7 @@ export class GoogleDriveVaultError extends Error {
 interface DriveFile {
   id: string;
   name: string;
-  size?: number;
+  size?: number | string;
 }
 
 interface GoogleTokenResponse {
@@ -349,16 +413,19 @@ function loadGoogleIdentityServices(): Promise<void> {
   return gisLoadPromise;
 }
 
-function isDriveFile(value: unknown): value is DriveFile {
+function isDriveFile(
+  value: unknown,
+  expectedName: SolslotAppDataFileName,
+): value is DriveFile {
   if (!value || typeof value !== 'object') return false;
   const file = value as Record<string, unknown>;
-  if (typeof file['id'] !== 'string' || file['name'] !== BACKUP_FILE_NAME) return false;
+  if (typeof file['id'] !== 'string' || file['name'] !== expectedName) return false;
   if (file['size'] === undefined) return true;
   const size = Number(file['size']);
   return Number.isSafeInteger(size) && size >= 0;
 }
 
-function relatedMultipartBody(metadata: Record<string, unknown>, envelope: SolslotVaultBackupEnvelope): {
+function relatedMultipartBody(metadata: Record<string, unknown>, documentJson: string): {
   boundary: string;
   bytes: Uint8Array;
 } {
@@ -367,20 +434,23 @@ function relatedMultipartBody(metadata: Record<string, unknown>, envelope: Solsl
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
     `${JSON.stringify(metadata)}\r\n` +
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
-    `${JSON.stringify(envelope)}\r\n` +
+    `${documentJson}\r\n` +
     `--${boundary}--\r\n`;
   return { boundary, bytes: new TextEncoder().encode(text) };
 }
 
-async function boundedResponseBytes(response: Response): Promise<Uint8Array> {
+async function boundedResponseBytes(
+  response: Response,
+  maxBytes: number,
+): Promise<Uint8Array> {
   const declared = response.headers.get('Content-Length');
-  if (declared && (!/^\d+$/.test(declared) || Number(declared) > GOOGLE_VAULT_MAX_BACKUP_BYTES)) {
+  if (declared && (!/^\d+$/.test(declared) || Number(declared) > maxBytes)) {
     throw new Error('oversized response');
   }
   const reader = response.body?.getReader();
   if (!reader) {
     const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength > GOOGLE_VAULT_MAX_BACKUP_BYTES) throw new Error('oversized response');
+    if (bytes.byteLength > maxBytes) throw new Error('oversized response');
     return bytes;
   }
   const chunks: Uint8Array[] = [];
@@ -390,7 +460,7 @@ async function boundedResponseBytes(response: Response): Promise<Uint8Array> {
       const { done, value } = await reader.read();
       if (done) break;
       total += value.byteLength;
-      if (total > GOOGLE_VAULT_MAX_BACKUP_BYTES) throw new Error('oversized response');
+      if (total > maxBytes) throw new Error('oversized response');
       chunks.push(value);
     }
   } finally {
@@ -405,8 +475,21 @@ async function boundedResponseBytes(response: Response): Promise<Uint8Array> {
   return bytes;
 }
 
-function sameEnvelope(a: SolslotVaultBackupEnvelope, b: SolslotVaultBackupEnvelope): boolean {
+function sameDocument(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function serializedDocumentBytes(value: unknown): Uint8Array {
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined) throw new Error('not serializable');
+    return new TextEncoder().encode(serialized);
+  } catch {
+    throw new GoogleDriveVaultError(
+      'invalid_backup',
+      'The Google Drive backup is invalid.',
+    );
+  }
 }
 
 function exactBuffer(value: Uint8Array): ArrayBuffer {

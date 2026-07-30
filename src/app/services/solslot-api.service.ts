@@ -248,7 +248,8 @@ export interface Eip712TypedData {
   domain: {
     name?: string;
     version?: string;
-    chainId: number | string;
+    chainId?: number | string;
+    salt?: string;
     verifyingContract?: string;
   };
   types: Record<string, Array<{ name: string; type: string }>>;
@@ -354,14 +355,14 @@ export interface ZkPassportEnrollmentRecord {
 }
 
 export interface SolslotPublicArtifact {
-  schemaVersion: 2;
+  schemaVersion: 4;
   sourceManifestVersion: 3;
-  protocolVersion: 'solslot-v2';
+  protocolVersion: 'solslot-v2-rc23';
   network: 'testnet11';
   evmChainId: 11155111;
   reviewClass: 'independent-release-review' | 'internal-engineering-testnet';
   testOnly: boolean;
-  auditStatus: 'independently-reviewed' | 'unaudited';
+  auditStatus: 'independently-reviewed' | 'pending-external-review';
   buildTimestamp: string;
   artifactHash: string;
   sourceShas: {
@@ -386,9 +387,12 @@ export interface SolslotPublicArtifact {
     pool: string;
     did: string;
     governance: string;
-    navRegistry: string;
+    statutes: string;
     protocolConfig: string;
     adminAuthority: string;
+    adminIdentity0: string;
+    adminIdentity1: string;
+    adminIdentity2: string;
     vaultVersionRegistry: string;
     propertyRegistry: string;
   };
@@ -433,21 +437,29 @@ export interface SolslotPublicArtifact {
     [key: string]: number;
   };
   stateVersions: {
-    navRegistry: number;
+    statutes: number;
+    pool: number;
     protocolConfig: number;
     adminAuthority: number;
     vault: number;
     propertyRegistry: number;
   };
   adminAuthority: {
+    version: 3;
     threshold: number;
     policy: 'owner-plus-one';
     ownerIndex: 0;
     coadminIndices: [1, 2];
     coadminThreshold: 1;
     rosterHash: string;
-    mipsRootHash: string;
+    sourceManifestHash: string;
+    operationalMipsRootHash: string;
+    lostRecoveryMipsRootHashes: [string, string, string];
+    routineDelaySeconds: 86400;
+    lostKeyDelaySeconds: 604800;
+    identityVaults: [AdminIdentityVaultArtifact, AdminIdentityVaultArtifact, AdminIdentityVaultArtifact];
     compressedPubkeys: string[];
+    recoveryKits: [AdminRecoveryKitArtifact, AdminRecoveryKitArtifact, AdminRecoveryKitArtifact];
   };
   validatorSet: { threshold: number; pubkeys: string[] };
   bridgePolicy: {
@@ -481,4 +493,25 @@ export interface SolslotPublicArtifact {
     signature: string;
   }>;
   [key: string]: unknown;
+}
+
+export interface AdminIdentityVaultArtifact {
+  slot: 0 | 1 | 2;
+  launcherAmount: 3 | 5 | 7;
+  launcherId: string;
+  dailyCompressedPubkey: string;
+  dailyMemberHash: string;
+  recoveryMemberHash: string;
+  recoveryBlsPubkey: string;
+  custodyHash: string;
+  fullPuzzleHash: string;
+}
+
+export interface AdminRecoveryKitArtifact {
+  slot: 0 | 1 | 2;
+  revision: number;
+  evmGuardian: string;
+  recoveryBlsPubkey: string;
+  recoveryBlsCommitment: string;
+  drillChallengeHash: string;
 }

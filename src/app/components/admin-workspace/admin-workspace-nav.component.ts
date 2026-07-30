@@ -39,7 +39,7 @@ import { AdminSessionService } from '../../services/admin-session.service';
         <a routerLink="/admin/approvals" routerLinkActive="is-active">Approvals</a>
         <a routerLink="/admin/sales" routerLinkActive="is-active">Sales</a>
         <a routerLink="/admin/system-health" routerLinkActive="is-active">Health</a>
-        <a routerLink="/admin/authority" routerLinkActive="is-active">Team</a>
+        <a routerLink="/admin/authority" routerLinkActive="is-active">Security</a>
       </div>
 
       <div class="workspace-account">
@@ -100,9 +100,11 @@ import { AdminSessionService } from '../../services/admin-session.service';
             <strong>Wallet lost or possibly compromised?</strong>
             <p>
               Stop signing. Tell the owner and another administrator immediately, then open
-              Team for the protected replacement procedure.
+              Security & Access for the protected replacement procedure.
             </p>
-            <a routerLink="/admin/authority" (click)="helpOpen.set(false)">Open Team</a>
+            <a routerLink="/admin/authority" (click)="helpOpen.set(false)">
+              Open Security & Access
+            </a>
           </div>
         </section>
       </div>

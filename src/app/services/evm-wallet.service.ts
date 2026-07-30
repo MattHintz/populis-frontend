@@ -11,6 +11,7 @@ import {
   isHexString,
 } from 'ethers';
 import { environment } from '../../environments/environment';
+import { TESTNET11_GENESIS_CHALLENGE_HEX } from './eip712-leaf-hash.service';
 import { Eip712TypedData } from './solslot-api.service';
 
 const WALLET_CONNECT_PROMPT_TIMEOUT_MS = 45_000;
@@ -38,6 +39,19 @@ export interface BaseSepoliaTransaction {
   to: string;
   value: string;
   data: string;
+}
+
+export interface AuthorityV3SafeTransaction {
+  to: string;
+  value: number | string;
+  data: string;
+  operation: number | string;
+  safeTxGas: number | string;
+  baseGas: number | string;
+  gasPrice: number | string;
+  gasToken: string;
+  refundReceiver: string;
+  nonce: number | string;
 }
 
 /**
@@ -358,6 +372,176 @@ export class EvmWalletService {
   }
 
   /**
+   * Sign one leaf approval for an Authority V3 nested Safe action. The
+   * Identity Safe, exact Root Safe transaction bytes, and zero-value policy are
+   * supplied by the server-sealed package and checked again here.
+   */
+  async signAuthorityV3SafeMessage(
+    typedData: Eip712TypedData,
+    expected: { identitySafe: string; transactionData: string },
+  ): Promise<string> {
+    if (
+      String(typedData.message['message']).toLowerCase() !==
+        expected.transactionData.toLowerCase() ||
+      !isHexString(expected.transactionData) ||
+      expected.transactionData === '0x'
+    ) {
+      throw new Error('Refusing altered Authority V3 nested Safe data.');
+    }
+    return this.signSafeMessage(typedData, expected.identitySafe);
+  }
+
+  /**
+   * Sign a direct Identity Safe transaction for a peer approval or
+   * cancellation. This is the standard SafeTx EIP-712 shape, constrained to
+   * one exact zero-value Authority V3 call.
+   */
+  async signAuthorityV3SafeTransaction(
+    typedData: Eip712TypedData,
+    expected: {
+      safe: string;
+      transaction: AuthorityV3SafeTransaction;
+    },
+  ): Promise<string> {
+    const transaction = expected.transaction;
+    const domainKeys = Object.keys(typedData.domain).sort();
+    const typeKeys = Object.keys(typedData.types).sort();
+    const messageKeys = Object.keys(typedData.message).sort();
+    const safeTxFields = [
+      { name: 'to', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'data', type: 'bytes' },
+      { name: 'operation', type: 'uint8' },
+      { name: 'safeTxGas', type: 'uint256' },
+      { name: 'baseGas', type: 'uint256' },
+      { name: 'gasPrice', type: 'uint256' },
+      { name: 'gasToken', type: 'address' },
+      { name: 'refundReceiver', type: 'address' },
+      { name: 'nonce', type: 'uint256' },
+    ];
+    const expectedMessage = {
+      to: getAddress(transaction.to),
+      value: Number(transaction.value),
+      data: transaction.data.toLowerCase(),
+      operation: Number(transaction.operation),
+      safeTxGas: Number(transaction.safeTxGas),
+      baseGas: Number(transaction.baseGas),
+      gasPrice: Number(transaction.gasPrice),
+      gasToken: getAddress(transaction.gasToken),
+      refundReceiver: getAddress(transaction.refundReceiver),
+      nonce: Number(transaction.nonce),
+    };
+    const actualMessage = {
+      to: getAddress(String(typedData.message['to'])),
+      value: Number(typedData.message['value']),
+      data: String(typedData.message['data']).toLowerCase(),
+      operation: Number(typedData.message['operation']),
+      safeTxGas: Number(typedData.message['safeTxGas']),
+      baseGas: Number(typedData.message['baseGas']),
+      gasPrice: Number(typedData.message['gasPrice']),
+      gasToken: getAddress(String(typedData.message['gasToken'])),
+      refundReceiver: getAddress(String(typedData.message['refundReceiver'])),
+      nonce: Number(typedData.message['nonce']),
+    };
+    if (
+      Number(typedData.domain.chainId) !== BASE_SEPOLIA_CHAIN_ID ||
+      !typedData.domain.verifyingContract ||
+      getAddress(typedData.domain.verifyingContract) !== getAddress(expected.safe) ||
+      JSON.stringify(domainKeys) !== JSON.stringify(['chainId', 'verifyingContract']) ||
+      JSON.stringify(typeKeys) !== JSON.stringify(['SafeTx']) ||
+      typedData.primaryType !== 'SafeTx' ||
+      JSON.stringify(typedData.types['SafeTx']) !== JSON.stringify(safeTxFields) ||
+      JSON.stringify(messageKeys) !==
+        JSON.stringify([
+          'baseGas',
+          'data',
+          'gasPrice',
+          'gasToken',
+          'nonce',
+          'operation',
+          'refundReceiver',
+          'safeTxGas',
+          'to',
+          'value',
+        ]) ||
+      JSON.stringify(actualMessage) !== JSON.stringify(expectedMessage) ||
+      !isHexString(expectedMessage.data) ||
+      expectedMessage.data === '0x' ||
+      expectedMessage.value !== 0 ||
+      expectedMessage.operation !== 0 ||
+      expectedMessage.safeTxGas !== 0 ||
+      expectedMessage.baseGas !== 0 ||
+      expectedMessage.gasPrice !== 0 ||
+      expectedMessage.gasToken !== '0x0000000000000000000000000000000000000000' ||
+      expectedMessage.refundReceiver !== '0x0000000000000000000000000000000000000000' ||
+      !Number.isSafeInteger(expectedMessage.nonce) ||
+      expectedMessage.nonce < 0
+    ) {
+      throw new Error('Refusing altered Authority V3 Identity Safe transaction data.');
+    }
+    return this.signTypedDataOnChain(typedData, BASE_SEPOLIA_CHAIN_ID);
+  }
+
+  /**
+   * Sign one exact Authority V3 identity-vault action using CHIP-0037.
+   * The Testnet11 salt, coin, delegated puzzle, field order, and committed
+   * administrator key are all checked before the wallet prompt is opened.
+   */
+  async signAuthorityV3ChiaAction(
+    typedData: Eip712TypedData,
+    expected: {
+      coinId: string;
+      delegatedPuzzleHash: string;
+      compressedPubkey: string;
+    },
+  ): Promise<string> {
+    const domainFields = [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'salt', type: 'bytes32' },
+    ];
+    const spendFields = [
+      { name: 'coin_id', type: 'bytes32' },
+      { name: 'delegated_puzzle_hash', type: 'bytes32' },
+    ];
+    const expectedSalt = `0x${TESTNET11_GENESIS_CHALLENGE_HEX}`;
+    if (
+      typedData.primaryType !== 'ChiaCoinSpend' ||
+      typedData.domain.name !== 'Chia Coin Spend' ||
+      typedData.domain.version !== '1' ||
+      String(typedData.domain.salt).toLowerCase() !== expectedSalt ||
+      JSON.stringify(Object.keys(typedData.domain).sort()) !==
+        JSON.stringify(['name', 'salt', 'version']) ||
+      JSON.stringify(Object.keys(typedData.types).sort()) !==
+        JSON.stringify(['ChiaCoinSpend', 'EIP712Domain']) ||
+      JSON.stringify(typedData.types['EIP712Domain']) !== JSON.stringify(domainFields) ||
+      JSON.stringify(typedData.types['ChiaCoinSpend']) !== JSON.stringify(spendFields) ||
+      JSON.stringify(Object.keys(typedData.message).sort()) !==
+        JSON.stringify(['coin_id', 'delegated_puzzle_hash']) ||
+      String(typedData.message['coin_id']).toLowerCase() !==
+        expected.coinId.toLowerCase() ||
+      String(typedData.message['delegated_puzzle_hash']).toLowerCase() !==
+        expected.delegatedPuzzleHash.toLowerCase() ||
+      !isHexString(expected.coinId, 32) ||
+      !isHexString(expected.delegatedPuzzleHash, 32) ||
+      !/^0x0[23][0-9a-f]{64}$/i.test(expected.compressedPubkey)
+    ) {
+      throw new Error('Refusing an altered Authority V3 Chia signing request.');
+    }
+    const signature = await this.signTypedDataOnChain(
+      typedData,
+      environment.eip712ChainId,
+    );
+    if (
+      this.recoverCompressedPubkey(typedData, signature).toLowerCase() !==
+      expected.compressedPubkey.toLowerCase()
+    ) {
+      throw new Error('The connected wallet is not the required administrator key.');
+    }
+    return signature;
+  }
+
+  /**
    * Sign an RC21 launch resume or action approval.
    *
    * This is intentionally separate from the general protocol signer. The
@@ -458,7 +642,7 @@ export class EvmWalletService {
       getAddress(transaction.to) !== transaction.to ||
       transaction.value.toLowerCase() !== '0x0'
     ) {
-      throw new Error('Refusing altered Base Sepolia Root Safe transaction.');
+      throw new Error('Refusing an altered Base Sepolia protocol transaction.');
     }
     if (this.connectionKind() === 'walletconnect') {
       const chain = formatWalletConnectChainId(BASE_SEPOLIA_CHAIN_ID);

@@ -18,15 +18,38 @@ const originalZkPassport = { ...environment.zkPassport };
 
 async function signedArtifact(slots: number[] = [0, 2]): Promise<SolslotPublicArtifact> {
   const wallets = ['01', '02', '03'].map((byte) => new Wallet(`0x${byte.repeat(32)}`));
+  const compressedPubkeys = wallets.map((wallet) =>
+    SigningKey.computePublicKey(wallet.privateKey, true),
+  );
+  const identityLaunchers = [HASH('19'), HASH('1a'), HASH('1b')] as const;
+  const identityVaults = ([0, 1, 2] as const).map((slot) => ({
+    slot,
+    launcherAmount: ([3, 5, 7] as const)[slot],
+    launcherId: identityLaunchers[slot],
+    dailyCompressedPubkey: compressedPubkeys[slot],
+    dailyMemberHash: HASH((30 + slot).toString(16)),
+    recoveryMemberHash: HASH((33 + slot).toString(16)),
+    recoveryBlsPubkey: `0x${(61 + slot).toString(16).repeat(48)}`,
+    custodyHash: HASH((36 + slot).toString(16)),
+    fullPuzzleHash: HASH((39 + slot).toString(16)),
+  })) as SolslotPublicArtifact['adminAuthority']['identityVaults'];
+  const recoveryKits = ([0, 1, 2] as const).map((slot) => ({
+    slot,
+    revision: 1,
+    evmGuardian: ADDRESS((71 + slot).toString(16)),
+    recoveryBlsPubkey: identityVaults[slot].recoveryBlsPubkey,
+    recoveryBlsCommitment: HASH((42 + slot).toString(16)),
+    drillChallengeHash: HASH((45 + slot).toString(16)),
+  })) as SolslotPublicArtifact['adminAuthority']['recoveryKits'];
   const artifact = {
-    schemaVersion: 2,
+    schemaVersion: 4,
     sourceManifestVersion: 3,
-    protocolVersion: 'solslot-v2',
+    protocolVersion: 'solslot-v2-rc23',
     network: 'testnet11',
     evmChainId: 11155111,
     reviewClass: 'internal-engineering-testnet',
     testOnly: true,
-    auditStatus: 'unaudited',
+    auditStatus: 'pending-external-review',
     buildTimestamp: '2026-07-14T00:00:00+00:00',
     artifactHash: '',
     sourceShas: {
@@ -51,11 +74,14 @@ async function signedArtifact(slots: number[] = [0, 2]): Promise<SolslotPublicAr
       pool: HASH('11'),
       did: HASH('12'),
       governance: HASH('13'),
-      navRegistry: HASH('14'),
+      statutes: HASH('14'),
       protocolConfig: HASH('15'),
       adminAuthority: HASH('16'),
       vaultVersionRegistry: HASH('17'),
       propertyRegistry: HASH('18'),
+      adminIdentity0: identityLaunchers[0],
+      adminIdentity1: identityLaunchers[1],
+      adminIdentity2: identityLaunchers[2],
     },
     puzzleHashes: {
       poolInnerPuzzleHash: HASH('21'),
@@ -96,23 +122,29 @@ async function signedArtifact(slots: number[] = [0, 2]): Promise<SolslotPublicAr
       minProposalStake: 10_000,
     },
     stateVersions: {
-      navRegistry: 1,
+      statutes: 1,
+      pool: 4,
       protocolConfig: 1,
-      adminAuthority: 2,
+      adminAuthority: 3,
       vault: 2,
       propertyRegistry: 0,
     },
     adminAuthority: {
+      version: 3,
       threshold: 2,
       policy: 'owner-plus-one',
       ownerIndex: 0,
       coadminIndices: [1, 2],
       coadminThreshold: 1,
       rosterHash: HASH('26'),
-      mipsRootHash: HASH('27'),
-      compressedPubkeys: wallets.map((wallet) =>
-        SigningKey.computePublicKey(wallet.privateKey, true),
-      ),
+      sourceManifestHash: HASH('27'),
+      operationalMipsRootHash: HASH('28'),
+      lostRecoveryMipsRootHashes: [HASH('2b'), HASH('2c'), HASH('2d')],
+      routineDelaySeconds: 86400,
+      lostKeyDelaySeconds: 604800,
+      identityVaults,
+      compressedPubkeys,
+      recoveryKits,
     },
     validatorSet: {
       threshold: 2,
@@ -160,7 +192,7 @@ async function signedArtifact(slots: number[] = [0, 2]): Promise<SolslotPublicAr
       adminIndex: index,
       compressedPubkey: artifact.adminAuthority.compressedPubkeys[index],
       signature: await wallets[index].signTypedData(
-        { name: 'Solslot Protocol', version: '2', chainId: 11155111 },
+        { name: 'Solslot Protocol', version: '4', chainId: 11155111 },
         {
           SolslotGenesisArtifact: [
             { name: 'artifactHash', type: 'bytes32' },

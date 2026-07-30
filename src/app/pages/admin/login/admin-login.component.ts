@@ -277,6 +277,7 @@ export class AdminLoginComponent {
       await this.session.loginWithWallet({
         address,
         pubkey,
+        authoritySlot: apiSession.authority_slot,
         expiresAt: apiSession.expires_at,
         signatureKind: 'eip712',
         signature,

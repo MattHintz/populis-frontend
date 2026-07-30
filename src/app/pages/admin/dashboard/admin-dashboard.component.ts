@@ -178,10 +178,10 @@ interface DeskTask {
         </a>
 
         <a routerLink="/admin/authority" class="desk-tile">
-          <span class="eyebrow">Team</span>
-          <strong>Administrators</strong>
-          <p>Review active administrator roles, approval rules, and key-safety guidance.</p>
-          <span class="tile-action">Open team</span>
+          <span class="eyebrow">Administrator protection</span>
+          <strong>Security & Access</strong>
+          <p>Test recovery kits, review wallet safety, and manage protected key changes.</p>
+          <span class="tile-action">Open security</span>
         </a>
 
         <a routerLink="/admin/genesis" class="desk-tile">

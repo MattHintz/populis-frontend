@@ -17,9 +17,12 @@ const REQUIRED_LAUNCHERS = [
   'pool',
   'did',
   'governance',
-  'navRegistry',
+  'statutes',
   'protocolConfig',
   'adminAuthority',
+  'adminIdentity0',
+  'adminIdentity1',
+  'adminIdentity2',
   'vaultVersionRegistry',
   'propertyRegistry',
 ] as const;
@@ -29,9 +32,12 @@ export interface SolslotProtocolCoordinates {
   poolInnerPuzzleHash: string;
   bridgePolicyHash: string;
   governanceLauncherId: string;
+  statutesLauncherId: string;
   collectionNavRegistryLauncherId: string;
   protocolConfigLauncherId: string;
+  adminAuthorityV3LauncherId: string;
   adminAuthorityV2LauncherId: string;
+  adminIdentityLauncherIds: [string, string, string];
   vaultVersionRegistryLauncherId: string;
   propertyRegistryLauncherId: string;
 }
@@ -116,9 +122,9 @@ async function verifyArtifact(
   expectedSourceSha: string,
 ): Promise<void> {
   if (
-    artifact.schemaVersion !== 2 ||
+    artifact.schemaVersion !== 4 ||
     artifact.sourceManifestVersion !== 3 ||
-    artifact.protocolVersion !== 'solslot-v2' ||
+    artifact.protocolVersion !== 'solslot-v2-rc23' ||
     artifact.network !== 'testnet11' ||
     artifact.evmChainId !== 11155111
   ) {
@@ -130,7 +136,7 @@ async function verifyArtifact(
   const reviewIsValid =
     (artifact.reviewClass === 'internal-engineering-testnet' &&
       artifact.testOnly === true &&
-      artifact.auditStatus === 'unaudited') ||
+      artifact.auditStatus === 'pending-external-review') ||
     (artifact.reviewClass === 'independent-release-review' &&
       artifact.testOnly === false &&
       artifact.auditStatus === 'independently-reviewed');
@@ -238,6 +244,7 @@ async function verifyArtifact(
     artifact.validatorSet?.threshold !== 2 ||
     artifact.validatorSet?.pubkeys?.length !== 3 ||
     artifact.validatorSet.pubkeys.some((value) => !HEX_48.test(value)) ||
+    artifact.adminAuthority?.version !== 3 ||
     artifact.adminAuthority?.threshold !== 2 ||
     artifact.adminAuthority?.policy !== 'owner-plus-one' ||
     artifact.adminAuthority?.ownerIndex !== 0 ||
@@ -246,7 +253,12 @@ async function verifyArtifact(
     artifact.adminAuthority?.compressedPubkeys?.length !== 3 ||
     artifact.adminAuthority.compressedPubkeys.some((value) => !HEX_33.test(value)) ||
     !HEX_32.test(artifact.adminAuthority.rosterHash || '') ||
-    !HEX_32.test(artifact.adminAuthority.mipsRootHash || '') ||
+    !HEX_32.test(artifact.adminAuthority.sourceManifestHash || '') ||
+    !HEX_32.test(artifact.adminAuthority.operationalMipsRootHash || '') ||
+    artifact.adminAuthority.lostRecoveryMipsRootHashes?.length !== 3 ||
+    artifact.adminAuthority.lostRecoveryMipsRootHashes.some((value) => !HEX_32.test(value)) ||
+    artifact.adminAuthority.routineDelaySeconds !== 86_400 ||
+    artifact.adminAuthority.lostKeyDelaySeconds !== 604_800 ||
     artifact.signaturePolicy?.type !== 'SolslotGenesisArtifact' ||
     artifact.signaturePolicy?.threshold !== 2 ||
     artifact.signaturePolicy?.policy !== 'owner-plus-one' ||
@@ -258,6 +270,7 @@ async function verifyArtifact(
   ) {
     throw new Error('The public artifact does not carry owner-plus-one admin authority.');
   }
+  verifyAuthorityV3(artifact);
   const addresses = artifact.evmAddresses;
   if (
     !addresses ||
@@ -284,7 +297,7 @@ async function verifyArtifact(
       const signer = verifyTypedData(
         {
           name: 'Solslot Protocol',
-          version: '2',
+          version: '4',
           chainId: artifact.evmChainId,
         },
         {
@@ -323,9 +336,16 @@ function artifactCoordinates(artifact: SolslotPublicArtifact): SolslotProtocolCo
     poolInnerPuzzleHash: artifact.puzzleHashes.poolInnerPuzzleHash,
     bridgePolicyHash: artifact.bridgePolicy.policyHash,
     governanceLauncherId: artifact.launcherIds.governance,
-    collectionNavRegistryLauncherId: artifact.launcherIds.navRegistry,
+    statutesLauncherId: artifact.launcherIds.statutes,
+    collectionNavRegistryLauncherId: '',
     protocolConfigLauncherId: artifact.launcherIds.protocolConfig,
+    adminAuthorityV3LauncherId: artifact.launcherIds.adminAuthority,
     adminAuthorityV2LauncherId: artifact.launcherIds.adminAuthority,
+    adminIdentityLauncherIds: [
+      artifact.launcherIds.adminIdentity0,
+      artifact.launcherIds.adminIdentity1,
+      artifact.launcherIds.adminIdentity2,
+    ],
     vaultVersionRegistryLauncherId: artifact.launcherIds.vaultVersionRegistry,
     propertyRegistryLauncherId: artifact.launcherIds.propertyRegistry,
   };
@@ -341,7 +361,12 @@ function installRuntimeBindings(
   Object.assign(environment.solslotProtocol, coordinates, {
     artifactVerified: true,
     retiredCoordinates: [...artifact.retiredCoordinates],
-    adminAuthorityV2MipsRootHash: artifact.adminAuthority.mipsRootHash,
+    adminAuthorityV3LauncherId: artifact.launcherIds.adminAuthority,
+    adminAuthorityV3OperationalMipsRootHash:
+      artifact.adminAuthority.operationalMipsRootHash,
+    adminAuthorityV3IdentityLauncherIds:
+      artifact.adminAuthority.identityVaults.map((identity) => identity.launcherId),
+    adminAuthorityV2MipsRootHash: artifact.adminAuthority.operationalMipsRootHash,
     adminAuthorityV2AdminAddresses: adminAddresses,
     adminAuthorityV2AdminPubkeys: [...artifact.adminAuthority.compressedPubkeys],
     governanceQuorumBps: artifact.protocolParameters.quorumBps,
@@ -379,11 +404,15 @@ function clearRuntimeBindings(): void {
     artifactVerified: false,
     retiredCoordinates: [],
     adminAuthorityV2LauncherId: '',
+    adminAuthorityV3LauncherId: '',
+    adminAuthorityV3OperationalMipsRootHash: '',
+    adminAuthorityV3IdentityLauncherIds: [],
     adminAuthorityV2MipsRootHash: '',
     adminAuthorityV2AdminAddresses: [],
     adminAuthorityV2AdminPubkeys: [],
     protocolConfigLauncherId: '',
     collectionNavRegistryLauncherId: '',
+    statutesLauncherId: '',
     poolLauncherId: '',
     poolInnerPuzzleHash: '',
     bridgePolicyHash: '',
@@ -410,6 +439,56 @@ function clearRuntimeBindings(): void {
     validatorPubkeys: [],
     validatorThreshold: 0,
   });
+}
+
+function verifyAuthorityV3(artifact: SolslotPublicArtifact): void {
+  const authority = artifact.adminAuthority;
+  const identities = authority.identityVaults;
+  const kits = authority.recoveryKits;
+  const launcherIds = [
+    artifact.launcherIds.adminIdentity0,
+    artifact.launcherIds.adminIdentity1,
+    artifact.launcherIds.adminIdentity2,
+  ];
+  const expectedAmounts = [3, 5, 7];
+  if (identities?.length !== 3 || kits?.length !== 3) {
+    throw new Error('The public artifact has an incomplete administrator recovery roster.');
+  }
+  const guardians = new Set<string>();
+  const recoveryKeys = new Set<string>();
+  for (let slot = 0; slot < 3; slot += 1) {
+    const identity = identities[slot];
+    const kit = kits[slot];
+    if (
+      identity.slot !== slot ||
+      identity.launcherAmount !== expectedAmounts[slot] ||
+      identity.launcherId.toLowerCase() !== launcherIds[slot].toLowerCase() ||
+      identity.dailyCompressedPubkey.toLowerCase() !==
+        authority.compressedPubkeys[slot].toLowerCase() ||
+      !HEX_33.test(identity.dailyCompressedPubkey) ||
+      !HEX_32.test(identity.dailyMemberHash) ||
+      !HEX_32.test(identity.recoveryMemberHash) ||
+      !HEX_48.test(identity.recoveryBlsPubkey) ||
+      !HEX_32.test(identity.custodyHash) ||
+      !HEX_32.test(identity.fullPuzzleHash) ||
+      kit.slot !== slot ||
+      !Number.isSafeInteger(kit.revision) ||
+      kit.revision < 1 ||
+      !HEX_20.test(kit.evmGuardian) ||
+      !HEX_48.test(kit.recoveryBlsPubkey) ||
+      kit.recoveryBlsPubkey.toLowerCase() !==
+        identity.recoveryBlsPubkey.toLowerCase() ||
+      !HEX_32.test(kit.recoveryBlsCommitment) ||
+      !HEX_32.test(kit.drillChallengeHash)
+    ) {
+      throw new Error('The public artifact has an invalid administrator identity vault.');
+    }
+    guardians.add(kit.evmGuardian.toLowerCase());
+    recoveryKeys.add(kit.recoveryBlsPubkey.toLowerCase());
+  }
+  if (guardians.size !== 3 || recoveryKeys.size !== 3) {
+    throw new Error('Every administrator must have a distinct recovery identity.');
+  }
 }
 
 function asciiStableJson(value: unknown): string {

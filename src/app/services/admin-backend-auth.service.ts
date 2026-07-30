@@ -51,9 +51,13 @@ export interface AdminLoginResponse {
   jwt: string;
   expires_at: number;
   owner: string;
+  authority_slot: 0 | 1 | 2;
+  compressed_pubkey: string;
 }
 
 export interface AdminRefreshResponse {
   jwt: string;
   expires_at: number;
+  authority_slot: 0 | 1 | 2;
+  compressed_pubkey: string;
 }

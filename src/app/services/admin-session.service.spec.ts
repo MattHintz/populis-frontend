@@ -7,7 +7,7 @@ import { AdminBackendAuthService } from './admin-backend-auth.service';
 import { SolslotProtocolArtifactService } from './solslot-protocol-artifact.service';
 
 describe('AdminSessionService', () => {
-  const storageKey = 'solslot_admin_session_v2';
+  const storageKey = 'solslot_admin_session_v3';
   const artifactHash = `0x${'ab'.repeat(32)}`;
   const wallet = new Wallet(`0x${'01'.repeat(32)}`);
   const secondWallet = new Wallet(`0x${'02'.repeat(32)}`);
@@ -51,12 +51,13 @@ describe('AdminSessionService', () => {
       service.loginWithWallet({
         ...envelope,
         signatureKind: 'eip712',
+        authoritySlot: 0,
       }),
     ).toBeResolvedTo(wallet.address.toLowerCase());
 
     expect(service.requireSession().address).toBe(wallet.address.toLowerCase());
     const stored = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
-    expect(stored.schemaVersion).toBe(3);
+    expect(stored.schemaVersion).toBe(4);
     expect(stored.protocolVersion).toBe('solslot-v2');
     expect(stored.network).toBe('testnet11');
     expect(stored.signatureKind).toBe('eip712');
@@ -122,7 +123,11 @@ describe('AdminSessionService', () => {
   it('invalidates an active session if its signer leaves the verified roster', async () => {
     const service = configure();
     const envelope = await signedEnvelope();
-    await service.loginWithWallet({ ...envelope, signatureKind: 'eip712' });
+    await service.loginWithWallet({
+      ...envelope,
+      signatureKind: 'eip712',
+      authoritySlot: 0,
+    });
     artifact.adminRoster = roster.slice(1);
 
     expect(() => service.requireSession()).toThrowError(
@@ -155,6 +160,7 @@ describe('AdminSessionService', () => {
     signature: string;
     typedData: Eip712TypedData;
     jwt: string;
+    authoritySlot: 0;
   }> {
     const issuedAt = Math.floor(Date.now() / 1_000);
     const typedData: Eip712TypedData = {
@@ -197,7 +203,8 @@ describe('AdminSessionService', () => {
       expiresAt,
       signature,
       typedData,
-      jwt: unsignedJwt(wallet.address, expiresAt),
+      jwt: unsignedJwt(wallet.address, pubkey, expiresAt),
+      authoritySlot: 0,
     };
   }
 
@@ -205,7 +212,7 @@ describe('AdminSessionService', () => {
     envelope: Awaited<ReturnType<typeof signedEnvelope>>,
   ): Record<string, unknown> {
     return {
-      schemaVersion: 3,
+      schemaVersion: 4,
       protocolVersion: 'solslot-v2',
       network: 'testnet11',
       signatureKind: 'eip712',
@@ -213,7 +220,7 @@ describe('AdminSessionService', () => {
     };
   }
 
-  function unsignedJwt(address: string, expiresAt: number): string {
+  function unsignedJwt(address: string, compressedPubkey: string, expiresAt: number): string {
     const encode = (value: unknown) =>
       btoa(JSON.stringify(value))
         .replace(/=/g, '')
@@ -223,6 +230,8 @@ describe('AdminSessionService', () => {
       sub: address.toLowerCase(),
       scope: 'admin',
       auth_type: 'evm',
+      authority_slot: 0,
+      compressed_pubkey: compressedPubkey.toLowerCase(),
       exp: expiresAt,
     })}.test-signature`;
   }

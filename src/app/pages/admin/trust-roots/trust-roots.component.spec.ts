@@ -30,7 +30,7 @@ describe('TrustRootsComponent', () => {
     }).compileComponents();
   });
 
-  it('shows exactly the eight signed V2 ceremony roots', () => {
+  it('shows all twelve signed RC23 ceremony roots', () => {
     create();
     const text = normalizedText();
 
@@ -39,11 +39,14 @@ describe('TrustRootsComponent', () => {
     expect(text).toContain('Pool V4');
     expect(text).toContain('Protocol DID');
     expect(text).toContain('Governance');
-    expect(text).toContain('NAV registry');
+    expect(text).toContain('Protocol statutes');
     expect(text).toContain('Protocol config');
     expect(text).toContain('Admin authority');
+    expect(text).toContain('Owner identity vault');
+    expect(text).toContain('Administrator 2 identity vault');
+    expect(text).toContain('Administrator 3 identity vault');
     expect(text).toContain('Vault version registry');
-    expect(fixture.nativeElement.querySelectorAll('article.card').length).toBe(8);
+    expect(fixture.nativeElement.querySelectorAll('article.card').length).toBe(12);
     expect(text).not.toContain('Launch A.3');
   });
 
@@ -59,7 +62,7 @@ describe('TrustRootsComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('article.card').length).toBe(0);
   });
 
-  it('checks the genesis coin and all seven singleton lineages', async () => {
+  it('checks the genesis coin and all eleven singleton lineages', async () => {
     const signedArtifact = artifactService.artifact!;
     coinset.getCoinRecordByName.and.resolveTo({
       confirmed_block_index: signedArtifact.ceremony.confirmedBlockIndex,
@@ -100,9 +103,9 @@ describe('TrustRootsComponent', () => {
     fixture.detectChanges();
 
     expect(coinset.getCoinRecordByName).toHaveBeenCalledOnceWith(signedArtifact.sgtGenesisCoinId);
-    expect(singleton.walkLineage).toHaveBeenCalledTimes(7);
-    expect(fixture.componentInstance.confirmedCount()).toBe(8);
-    expect(normalizedText()).toContain('8 of 8 verified');
+    expect(singleton.walkLineage).toHaveBeenCalledTimes(11);
+    expect(fixture.componentInstance.confirmedCount()).toBe(12);
+    expect(normalizedText()).toContain('12 of 12 verified');
   });
 
   it('does not accept a singleton launched outside the signed ceremony block', async () => {
@@ -142,21 +145,48 @@ function artifact(): SolslotPublicArtifact {
     pool: hex(1),
     did: hex(2),
     governance: hex(3),
-    navRegistry: hex(4),
+    statutes: hex(4),
     protocolConfig: hex(5),
     adminAuthority: hex(6),
     vaultVersionRegistry: hex(7),
     propertyRegistry: hex(20),
+    adminIdentity0: hex(27),
+    adminIdentity1: hex(28),
+    adminIdentity2: hex(29),
   };
+  const administratorKeys = [compressed(1), compressed(2), compressed(3)];
+  const identityVaults = ([0, 1, 2] as const).map((slot) => ({
+    slot,
+    launcherAmount: ([3, 5, 7] as const)[slot],
+    launcherId: [
+      launchers.adminIdentity0,
+      launchers.adminIdentity1,
+      launchers.adminIdentity2,
+    ][slot],
+    dailyCompressedPubkey: administratorKeys[slot],
+    dailyMemberHash: hex(110 + slot),
+    recoveryMemberHash: hex(113 + slot),
+    recoveryBlsPubkey: `0x${(40 + slot).toString(16).repeat(48)}`,
+    custodyHash: hex(116 + slot),
+    fullPuzzleHash: hex(119 + slot),
+  })) as SolslotPublicArtifact['adminAuthority']['identityVaults'];
+  const recoveryKits = ([0, 1, 2] as const).map((slot) => ({
+    slot,
+    revision: 1,
+    evmGuardian: address(10 + slot),
+    recoveryBlsPubkey: identityVaults[slot].recoveryBlsPubkey,
+    recoveryBlsCommitment: hex(122 + slot),
+    drillChallengeHash: hex(125 + slot),
+  })) as SolslotPublicArtifact['adminAuthority']['recoveryKits'];
   return {
-    schemaVersion: 2,
+    schemaVersion: 4,
     sourceManifestVersion: 3,
-    protocolVersion: 'solslot-v2',
+    protocolVersion: 'solslot-v2-rc23',
     network: 'testnet11',
     evmChainId: 11155111,
     reviewClass: 'internal-engineering-testnet',
     testOnly: true,
-    auditStatus: 'unaudited',
+    auditStatus: 'pending-external-review',
     buildTimestamp: '2026-07-14T00:00:00Z',
     artifactHash: hex(8),
     sourceShas: {
@@ -171,7 +201,7 @@ function artifact(): SolslotPublicArtifact {
       adminPortal: '9'.repeat(40),
     },
     ceremony: {
-      ceremonyId: 'ceremony-1',
+      ceremonyId: hex(30),
       planHash: hex(9),
       spendBundleId: hex(10),
       confirmedBlockIndex: 1_234,
@@ -215,21 +245,29 @@ function artifact(): SolslotPublicArtifact {
       minProposalStake: 1,
     },
     stateVersions: {
-      navRegistry: 1,
+      statutes: 1,
+      pool: 4,
       protocolConfig: 2,
-      adminAuthority: 2,
+      adminAuthority: 3,
       vault: 2,
       propertyRegistry: 0,
     },
     adminAuthority: {
+      version: 3,
       threshold: 2,
       policy: 'owner-plus-one',
       ownerIndex: 0,
       coadminIndices: [1, 2],
       coadminThreshold: 1,
       rosterHash: hex(15),
-      mipsRootHash: hex(16),
-      compressedPubkeys: [compressed(1), compressed(2), compressed(3)],
+      sourceManifestHash: hex(16),
+      operationalMipsRootHash: hex(17),
+      lostRecoveryMipsRootHashes: [hex(18), hex(19), hex(21)],
+      routineDelaySeconds: 86400,
+      lostKeyDelaySeconds: 604800,
+      identityVaults,
+      compressedPubkeys: administratorKeys,
+      recoveryKits,
     },
     validatorSet: {
       threshold: 2,

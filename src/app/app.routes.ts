@@ -62,6 +62,14 @@ export const routes: Routes = [
     title: 'Alpha Protocol Launch · Solslot',
   },
   {
+    path: 'admin/genesis/security',
+    loadComponent: () =>
+      import('./pages/admin/admin-authority/admin-authority.component').then(
+        (m) => m.AdminAuthorityComponent,
+      ),
+    title: 'Security & Access · Solslot',
+  },
+  {
     path: 'admin',
     // The guard pushes the original URL into ?returnTo= so users land
     // back on their target page after signing in.  Static-imported so
@@ -179,7 +187,23 @@ export const routes: Routes = [
       import('./pages/admin/admin-authority/admin-authority.component').then(
         (m) => m.AdminAuthorityComponent,
       ),
-    title: 'Administrator Team · Solslot',
+    title: 'Security & Access · Solslot',
+  },
+  {
+    path: 'admin/recover-wallet',
+    loadComponent: () =>
+      import('./pages/admin/lost-recovery/admin-lost-recovery.component').then(
+        (m) => m.AdminLostRecoveryComponent,
+      ),
+    title: 'Recover Administrator Wallet · Solslot',
+  },
+  {
+    path: 'recover-admin-access',
+    loadComponent: () =>
+      import('./pages/admin/recovery-access/admin-recovery-access.component').then(
+        (m) => m.AdminRecoveryAccessComponent,
+      ),
+    title: 'Administrator Recovery · Solslot',
   },
   {
     path: 'admin/approvals',

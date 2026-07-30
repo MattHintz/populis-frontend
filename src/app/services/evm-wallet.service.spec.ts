@@ -72,6 +72,44 @@ describe('EvmWalletService', () => {
     };
   }
 
+  function safeTransactionTypedData(
+    safe = '0x73a282e829dF5b7E12824a53F54c2FB6f07D13a5',
+  ) {
+    return {
+      domain: {
+        chainId: 84532,
+        verifyingContract: safe,
+      },
+      types: {
+        SafeTx: [
+          { name: 'to', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'data', type: 'bytes' },
+          { name: 'operation', type: 'uint8' },
+          { name: 'safeTxGas', type: 'uint256' },
+          { name: 'baseGas', type: 'uint256' },
+          { name: 'gasPrice', type: 'uint256' },
+          { name: 'gasToken', type: 'address' },
+          { name: 'refundReceiver', type: 'address' },
+          { name: 'nonce', type: 'uint256' },
+        ],
+      },
+      primaryType: 'SafeTx',
+      message: {
+        to: '0xb7e02C216A2B3aF0cC4Ad8808fA169f2F0B19724',
+        value: 0,
+        data: '0x6a761202',
+        operation: 0,
+        safeTxGas: 0,
+        baseGas: 0,
+        gasPrice: 0,
+        gasToken: '0x0000000000000000000000000000000000000000',
+        refundReceiver: '0x0000000000000000000000000000000000000000',
+        nonce: 4,
+      },
+    };
+  }
+
   it('retries WalletConnect relay failures after clearing stale session state', async () => {
     localStorage.setItem('wc@2:client:0.3//pairing', 'stale');
     localStorage.setItem('@walletconnect/core:topic', 'stale');
@@ -340,6 +378,53 @@ describe('EvmWalletService', () => {
     ).toBeRejectedWithError(/Refusing altered Base Sepolia SafeMessage/);
   });
 
+  it('signs only an exact zero-value Authority V3 Identity Safe transaction', async () => {
+    const service = create();
+    const signature = '0x' + '12'.repeat(64) + '1b';
+    const request = jasmine.createSpy('request').and.resolveTo(signature);
+    const typedData = safeTransactionTypedData();
+    const chain = 'eip155:84532';
+    const testable = service as unknown as {
+      _state: { set: (state: unknown) => void };
+      eip1193: { request: typeof request };
+      wcProvider: unknown;
+    };
+    testable._state.set({ kind: 'connected', address: walletAddress, connection: 'walletconnect' });
+    testable.eip1193 = { request };
+    testable.wcProvider = {
+      signer: {
+        request,
+        session: {
+          namespaces: {
+            eip155: {
+              chains: [chain],
+              methods: ['eth_signTypedData_v4'],
+              accounts: [`${chain}:${walletAddress}`],
+            },
+          },
+        },
+      },
+    };
+
+    expect(
+      await service.signAuthorityV3SafeTransaction(typedData, {
+        safe: typedData.domain.verifyingContract,
+        transaction: typedData.message,
+      }),
+    ).toBe(signature);
+
+    const altered = {
+      ...typedData,
+      message: { ...typedData.message, value: 1 },
+    };
+    await expectAsync(
+      service.signAuthorityV3SafeTransaction(altered, {
+        safe: typedData.domain.verifyingContract,
+        transaction: typedData.message,
+      }),
+    ).toBeRejectedWithError(/Refusing altered Authority V3 Identity Safe/);
+  });
+
   it('broadcasts only a byte-exact zero-value Base Sepolia transaction', async () => {
     const service = create();
     const transactionHash = '0x' + '99'.repeat(32);
@@ -399,7 +484,7 @@ describe('EvmWalletService', () => {
         value: '0x1',
         data: '0x6a761202',
       }),
-    ).toBeRejectedWithError(/Refusing altered Base Sepolia Root Safe transaction/);
+    ).toBeRejectedWithError(/Refusing an altered Base Sepolia protocol transaction/);
   });
 
   it('refuses typed data outside the allowed Solslot Sepolia domains', async () => {

@@ -15,10 +15,14 @@ type RootKey =
   | 'pool'
   | 'did'
   | 'governance'
-  | 'navRegistry'
+  | 'statutes'
   | 'protocolConfig'
   | 'adminAuthority'
-  | 'vaultVersionRegistry';
+  | 'adminIdentity0'
+  | 'adminIdentity1'
+  | 'adminIdentity2'
+  | 'vaultVersionRegistry'
+  | 'propertyRegistry';
 
 type RootStatus =
   | { kind: 'unverified' }
@@ -120,7 +124,7 @@ interface TrustRootView {
               On-chain confirmation
             </div>
             <div class="font-display mt-1 text-2xl">
-              {{ confirmedCount() }} of 8 verified
+              {{ confirmedCount() }} of {{ roots().length }} verified
             </div>
           </div>
           <button
@@ -342,10 +346,14 @@ function initialStatuses(): Record<RootKey, RootStatus> {
     pool: { kind: 'unverified' },
     did: { kind: 'unverified' },
     governance: { kind: 'unverified' },
-    navRegistry: { kind: 'unverified' },
+    statutes: { kind: 'unverified' },
     protocolConfig: { kind: 'unverified' },
     adminAuthority: { kind: 'unverified' },
+    adminIdentity0: { kind: 'unverified' },
+    adminIdentity1: { kind: 'unverified' },
+    adminIdentity2: { kind: 'unverified' },
     vaultVersionRegistry: { kind: 'unverified' },
+    propertyRegistry: { kind: 'unverified' },
   };
 }
 
@@ -369,12 +377,7 @@ function buildRoots(artifact: SolslotPublicArtifact | null): TrustRootView[] {
       artifact,
       artifact.governanceStruct.treeHash,
     ),
-    singletonRoot(
-      'navRegistry',
-      'NAV registry',
-      'Versioned collection NAV authority.',
-      artifact,
-    ),
+    singletonRoot('statutes', 'Protocol statutes', 'Governed parameter and route registry.', artifact),
     singletonRoot(
       'protocolConfig',
       'Protocol config',
@@ -384,15 +387,43 @@ function buildRoots(artifact: SolslotPublicArtifact | null): TrustRootView[] {
     singletonRoot(
       'adminAuthority',
       'Admin authority',
-      'Three-member roster with a 2-of-3 threshold.',
+      'Fixed owner-plus-one authority over three identity vaults.',
       artifact,
-      artifact.adminAuthority.mipsRootHash,
+      artifact.adminAuthority.operationalMipsRootHash,
+    ),
+    singletonRoot(
+      'adminIdentity0',
+      'Owner identity vault',
+      'Recoverable daily key for the owner authority slot.',
+      artifact,
+      artifact.adminAuthority.identityVaults[0].fullPuzzleHash,
+    ),
+    singletonRoot(
+      'adminIdentity1',
+      'Administrator 2 identity vault',
+      'Recoverable daily key for coadministrator slot 1.',
+      artifact,
+      artifact.adminAuthority.identityVaults[1].fullPuzzleHash,
+    ),
+    singletonRoot(
+      'adminIdentity2',
+      'Administrator 3 identity vault',
+      'Recoverable daily key for coadministrator slot 2.',
+      artifact,
+      artifact.adminAuthority.identityVaults[2].fullPuzzleHash,
     ),
     singletonRoot(
       'vaultVersionRegistry',
       'Vault version registry',
       'Approved vault code and credential policy versions.',
       artifact,
+    ),
+    singletonRoot(
+      'propertyRegistry',
+      'Property registry',
+      'Canonical governed collection registry.',
+      artifact,
+      artifact.propertyRegistry.currentPuzzleHash,
     ),
   ];
 }

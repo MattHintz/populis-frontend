@@ -7,7 +7,7 @@ import { SolslotProtocolArtifactService } from './solslot-protocol-artifact.serv
 import { AdminBackendAuthService } from './admin-backend-auth.service';
 
 /** Lowercase V2 key intentionally ignores every pre-ceremony session. */
-const STORAGE_KEY = 'solslot_admin_session_v2';
+const STORAGE_KEY = 'solslot_admin_session_v3';
 
 const ADMIN_LOGIN_TYPES = [
   { name: 'owner', type: 'address' },
@@ -58,6 +58,10 @@ export class AdminSessionService implements OnDestroy {
     const state = this._state();
     return state.kind === 'authenticated' ? state.jwt : null;
   });
+  readonly authoritySlot = computed(() => {
+    const state = this._state();
+    return state.kind === 'authenticated' ? state.authoritySlot : null;
+  });
 
   constructor() {
     const state = this._state();
@@ -78,6 +82,7 @@ export class AdminSessionService implements OnDestroy {
     this.beginSession({
       address: verified.address,
       pubkey: verified.pubkey,
+      authoritySlot: opts.authoritySlot,
       expiresAt: opts.expiresAt,
       signatureKind: 'eip712',
       signature: opts.signature,
@@ -133,11 +138,12 @@ export class AdminSessionService implements OnDestroy {
   private persist(state: AuthenticatedAdminState): void {
     if (typeof window === 'undefined') return;
     const persisted: PersistedAdminSession = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       protocolVersion: environment.protocolVersion,
       network: 'testnet11',
       address: state.address,
       pubkey: state.pubkey,
+      authoritySlot: state.authoritySlot,
       expiresAt: state.expiresAt,
       signatureKind: 'eip712',
       signature: state.signature,
@@ -156,7 +162,7 @@ export class AdminSessionService implements OnDestroy {
     try {
       const parsed = JSON.parse(raw) as PersistedAdminSession;
       if (
-        parsed.schemaVersion !== 3 ||
+        parsed.schemaVersion !== 4 ||
         parsed.protocolVersion !== environment.protocolVersion ||
         parsed.network !== 'testnet11' ||
         parsed.signatureKind !== 'eip712' ||
@@ -169,6 +175,7 @@ export class AdminSessionService implements OnDestroy {
         kind: 'authenticated',
         address: verified.address,
         pubkey: verified.pubkey,
+        authoritySlot: parsed.authoritySlot,
         expiresAt: parsed.expiresAt,
         signatureKind: 'eip712',
         signature: parsed.signature,
@@ -247,10 +254,19 @@ export class AdminSessionService implements OnDestroy {
       throw new Error('Administrator login signature is invalid.');
     }
 
+    if (!Number.isInteger(input.authoritySlot) || input.authoritySlot < 0 || input.authoritySlot > 2) {
+      throw new Error('Administrator authority slot is invalid.');
+    }
+    let adminRoster: string[];
+    try {
+      adminRoster = this.protocolArtifact.adminRoster.map(normalizePubkey);
+    } catch {
+      throw new Error('Administrator key is not in the signed genesis roster.');
+    }
     if (
-      !this.protocolArtifact.adminRoster.some(
-        (candidate) => candidate.toLowerCase() === pubkey,
-      )
+      adminRoster.length !== 3 ||
+      new Set(adminRoster).size !== 3 ||
+      adminRoster[input.authoritySlot] !== pubkey
     ) {
       throw new Error('Administrator key is not in the signed genesis roster.');
     }
@@ -259,7 +275,9 @@ export class AdminSessionService implements OnDestroy {
       String(jwtPayload['sub'] || '').toLowerCase() !== address ||
       jwtPayload['scope'] !== 'admin' ||
       jwtPayload['auth_type'] !== 'evm' ||
-      Number(jwtPayload['exp']) !== input.expiresAt
+      Number(jwtPayload['exp']) !== input.expiresAt ||
+      Number(jwtPayload['authority_slot']) !== input.authoritySlot ||
+      normalizePubkey(String(jwtPayload['compressed_pubkey'] || '')) !== pubkey
     ) {
       throw new Error('Administrator API session does not match the signed wallet.');
     }
@@ -294,6 +312,7 @@ export class AdminSessionService implements OnDestroy {
         ...state,
         jwt: refreshed.jwt,
         expiresAt: refreshed.expires_at,
+        authoritySlot: refreshed.authority_slot,
       };
       this.verifyEnvelope(next);
       this._state.set(next);
@@ -325,7 +344,7 @@ export interface AuthenticatedAdminState extends EnvelopeFields {
 }
 
 interface PersistedAdminSession extends EnvelopeFields {
-  schemaVersion: 3;
+  schemaVersion: 4;
   protocolVersion: 'solslot-v2';
   network: 'testnet11';
   signatureKind: 'eip712';
@@ -334,6 +353,7 @@ interface PersistedAdminSession extends EnvelopeFields {
 interface EnvelopeFields {
   address: string;
   pubkey: string;
+  authoritySlot: 0 | 1 | 2;
   expiresAt: number;
   signature: string;
   typedData: Eip712TypedData;

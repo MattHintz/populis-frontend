@@ -91,7 +91,7 @@ describe('GoogleDriveVaultService', () => {
 
     await expectAsync(service.loadBackup()).toBeRejectedWithError(
       GoogleDriveVaultError,
-      /Multiple SolSlot vault backups/,
+      /Multiple Solslot backups of this type/,
     );
   });
 

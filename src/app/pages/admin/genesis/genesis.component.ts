@@ -273,6 +273,9 @@ export class GenesisComponent implements OnInit, OnDestroy {
       case 'enrollment':
         this.focusElement('administrator-team');
         return;
+      case 'securityAccess':
+        await this.router.navigate(['/admin/genesis/security']);
+        return;
       case 'railOwnership':
         await this.advanceRailOwnership();
         return;
@@ -1006,6 +1009,7 @@ export class GenesisComponent implements OnInit, OnDestroy {
     if (!this.taskAssignedToCurrentSession()) return 'Refresh status';
     const labels: Record<string, string> = {
       enrollment: 'Review administrator team',
+      securityAccess: 'Set up recovery',
       railOwnership: 'Continue rail ownership',
       settlementRehearsal: 'Run customer payment check',
       funding: 'Continue ceremony funding',

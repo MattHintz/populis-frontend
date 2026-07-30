@@ -6,8 +6,9 @@
 [![codecov](https://codecov.io/github/Rigidity/chia-wallet-sdk/graph/badge.svg?token=M2MPMFGCCA)](https://codecov.io/github/Rigidity/chia-wallet-sdk)
 
 Solslot maintains a public WASM patch lane on the `solslot-wasm-crackpack`
-branch. See [`SOLSLOT_WASM_CRACKPACK.md`](SOLSLOT_WASM_CRACKPACK.md) for the
-preserved EIP-712 bindings, WASM-safe patch notes, and upstream update flow.
+branch. [`PROVENANCE.json`](PROVENANCE.json) pins the exact source commit,
+artifact checksum, and retained EIP-712 exports. This browser artifact is only
+for clear signing; it is not an administrator recovery authority.
 
 This is a library for building applications that need to interact with coins on the [Chia blockchain](https://chia.net), including wallets and dApps (decentralized apps). However, it is _not_ a prebuilt wallet. If you are looking for that, you can use [Sage Wallet](https://github.com/xch-dev/sage), which is a light wallet built using the Wallet SDK that provides an RPC interface.
 

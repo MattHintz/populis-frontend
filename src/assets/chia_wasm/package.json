@@ -15,7 +15,10 @@
     "chia_wallet_sdk_wasm_bg.wasm",
     "chia_wallet_sdk_wasm.js",
     "chia_wallet_sdk_wasm_bg.js",
-    "chia_wallet_sdk_wasm.d.ts"
+    "chia_wallet_sdk_wasm.d.ts",
+    "PROVENANCE.json",
+    "SHA256SUMS",
+    "README.md"
   ],
   "main": "chia_wallet_sdk_wasm.js",
   "homepage": "https://github.com/MattHintz/chia-wallet-sdk/tree/solslot-wasm-crackpack",
