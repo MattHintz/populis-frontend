@@ -40,6 +40,7 @@
     "@angular/forms": "~20.3.26",
     "@angular/platform-browser": "~20.3.26",
     "@angular/router": "~20.3.26",
+    "@lucide/angular": "1.28.0",
     "@scure/bip39": "1.6.0",
     "@walletconnect/ethereum-provider": "~2.23.10",
     "@walletconnect/sign-client": "~2.23.10",

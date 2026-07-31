@@ -282,6 +282,7 @@ export class AdminApprovalsComponent {
       'presale.create': 'Create refundable presale',
       'presale.cancel': 'Cancel refundable presale',
       'presale.launch': 'Open presale delivery',
+      'stripe.dispute.resolve': 'Resolve Stripe payment dispute',
     };
     return labels[operation];
   }
@@ -296,10 +297,16 @@ export class AdminApprovalsComponent {
     if (operation.startsWith('presale.')) {
       return 'Changes a refundable testnet voucher campaign and its customer fulfillment state.';
     }
+    if (operation === 'stripe.dispute.resolve') {
+      return 'Records the final Stripe result and restores protocol actions for the same delivered SmartDeed.';
+    }
     return 'Changes the reviewed protocol payment capacity on Testnet11.';
   }
 
   operationImpact(operation: AdminOperationName): string {
+    if (operation === 'stripe.dispute.resolve') {
+      return 'This does not move the SmartDeed or recover funds. It only closes the incident pause after final evidence.';
+    }
     return operation.includes('cancel')
       ? 'This stops the selected testnet operation.'
       : 'No production investment or mainnet asset is affected.';

@@ -16,7 +16,8 @@ export type AdminOperationName =
   | 'mint.publish'
   | 'presale.create'
   | 'presale.cancel'
-  | 'presale.launch';
+  | 'presale.launch'
+  | 'stripe.dispute.resolve';
 
 export interface AdminRequestBindingV1 {
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
