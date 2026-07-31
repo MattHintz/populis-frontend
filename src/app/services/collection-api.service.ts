@@ -560,8 +560,9 @@ export type VoucherState =
 export interface PresaleVoucher {
   serial: number;
   deedLauncherId: string;
-  paymentRail: 'BASE_SEPOLIA_USDC' | 'CHIA_XCH';
+  paymentRail: 'BASE_SEPOLIA_USDC' | 'CHIA_XCH' | 'STRIPE_USD';
   paymentPrincipal: number;
+  processingChargeMinor?: number;
   basePriceMinor: number;
   technologyFeeBps: number;
   technologyFeeMinor: number;
@@ -572,6 +573,7 @@ export interface PresaleVoucher {
   purchaseId: string;
   globalPaymentId: string;
   commitmentHash: string;
+  stripeReceiptHash?: string | null;
   state: VoucherState;
   deliveryDeadline: number | null;
   createdAt: number;
