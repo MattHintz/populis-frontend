@@ -279,6 +279,7 @@ export class AdminApprovalsComponent {
       'mint.cancel': 'Cancel mint proposal',
       'mint.execute': 'Execute approved SmartDeed mint',
       'mint.publish': 'Publish SmartDeed proposal',
+      'sgt.allocate': 'Open or complete SGT allocation vote',
       'presale.create': 'Create refundable presale',
       'presale.cancel': 'Cancel refundable presale',
       'presale.launch': 'Open presale delivery',
@@ -292,6 +293,9 @@ export class AdminApprovalsComponent {
     }
     if (operation.startsWith('mint.')) {
       return 'Changes a governed SmartDeed issuance proposal on Testnet11.';
+    }
+    if (operation === 'sgt.allocate') {
+      return 'Moves a fixed SGT allocation from the company reserve only after committee approval.';
     }
     if (operation.startsWith('presale.')) {
       return 'Changes a refundable testnet voucher campaign and its customer fulfillment state.';

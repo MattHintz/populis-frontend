@@ -137,6 +137,15 @@ export const routes: Routes = [
     pathMatch: 'full',
   },
   {
+    path: 'admin/sgt-allocations',
+    canActivate: [adminAuthGuard],
+    loadComponent: () =>
+      import('./pages/admin/sgt-allocations/sgt-allocations.component').then(
+        (m) => m.SgtAllocationsComponent,
+      ),
+    title: 'SGT Allocations · Solslot',
+  },
+  {
     path: 'admin/sols-liquidity',
     canActivate: [adminAuthGuard],
     loadComponent: () =>

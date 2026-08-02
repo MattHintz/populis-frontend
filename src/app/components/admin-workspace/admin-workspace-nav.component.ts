@@ -37,6 +37,7 @@ import { AdminSessionService } from '../../services/admin-session.service';
         </a>
         <a routerLink="/admin/collections" routerLinkActive="is-active">Collections</a>
         <a routerLink="/admin/approvals" routerLinkActive="is-active">Approvals</a>
+        <a routerLink="/admin/sgt-allocations" routerLinkActive="is-active">SGT</a>
         <a routerLink="/admin/sales" routerLinkActive="is-active">Sales</a>
         <a routerLink="/admin/system-health" routerLinkActive="is-active">Health</a>
         <a routerLink="/admin/authority" routerLinkActive="is-active">Security</a>

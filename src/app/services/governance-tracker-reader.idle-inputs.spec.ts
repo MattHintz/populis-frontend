@@ -20,7 +20,7 @@ import { bytesToHex, hexToBytes } from '../utils/chia-hash';
  * Test scenario: construct a 3-coin tracker lineage —
  * ``LAUNCHER → eve(IDLE→PROPOSE) → postEve(OPEN→EXECUTE) → current(IDLE, unspent)`` —
  * where `postEve` has a real singleton-wrapped OPEN-state inner puzzle
- * reveal that uncurries cleanly into 12 immutable + 4 OPEN state args.
+ * reveal that uncurries cleanly into 15 immutable + 4 OPEN state args.
  * The reader must reconstruct the current IDLE inner by re-currying the
  * same 12 immutable args with four nil state args, and the resulting
  * full puzzle hash must match the synthetic current coin's claimed
@@ -112,7 +112,7 @@ describe('GovernanceTrackerReaderService.getIdleStateProposeInputs', () => {
       const sdk = chiaSdk();
       const clvm = new sdk.Clvm();
 
-      // ── 1. Build the 12 immutable curried args (placeholder bytes) ──
+      // ── 1. Build the 15 immutable curried args (placeholder bytes) ──
       // Any stable values work; the test only verifies the reader
       // preserves them when substituting the trailing 4 state args.
       const immutable = buildImmutableArgs(clvm);
@@ -235,7 +235,7 @@ describe('GovernanceTrackerReaderService.getIdleStateProposeInputs', () => {
       );
 
       // The reconstructed IDLE inner hex MUST equal what we serialised
-      // directly — i.e. the reader recovered the 12 immutable args
+      // directly — i.e. the reader recovered the 15 immutable args
       // byte-for-byte and substituted nil for the 4 state args.
       const reconstructedHex = result.trackerInnerPuzzleHex;
       expect(reconstructedHex).toBe(bytesToHex(idleInner.serialize()));
@@ -282,7 +282,7 @@ describe('GovernanceTrackerReaderService.getIdleStateProposeInputs', () => {
   }
 
   function buildImmutableArgs(clvm: RealClvm): RealProgram[] {
-    // 12 stable placeholders.  Mix of atom and pair shapes mimics the
+    // 15 stable placeholders. Mix of atom and pair shapes mimics the
     // real tracker curry (which has bytes32 args and a nested
     // pool_singleton_struct pair); the exact bytes don't matter for
     // this test, only that they round-trip through serialize+curry.
@@ -307,10 +307,25 @@ describe('GovernanceTrackerReaderService.getIdleStateProposeInputs', () => {
           clvm.atom(hexToBytes(SINGLETON_LAUNCHER_HASH)),
         ),
       ), // pool_singleton_struct
+      clvm.pair(
+        clvm.atom(hexToBytes(SINGLETON_MOD_HASH)),
+        clvm.pair(
+          clvm.atom(hexToBytes('0x' + '16'.repeat(32))),
+          clvm.atom(hexToBytes(SINGLETON_LAUNCHER_HASH)),
+        ),
+      ), // admin_authority_struct
+      clvm.pair(
+        clvm.atom(hexToBytes(SINGLETON_MOD_HASH)),
+        clvm.pair(
+          clvm.atom(hexToBytes('0x' + '17'.repeat(32))),
+          clvm.atom(hexToBytes(SINGLETON_LAUNCHER_HASH)),
+        ),
+      ), // statutes_singleton_struct
       clvm.int(1000n), // quorum_bps
       clvm.int(86400n), // voting_window_seconds
       clvm.int(1_000_000n), // sgt_total_supply
       clvm.int(10_000n), // min_proposal_stake
+      clvm.atom(hexToBytes('0x' + '18'.repeat(48))), // kos_mint_execute_pubkey
     ];
   }
 

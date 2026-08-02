@@ -512,6 +512,75 @@ describe('GovernanceTrackerReaderService', () => {
     }
   });
 
+  it('decodes an exact SGT sale bill', () => {
+    const billOp = list([
+      atom(Uint8Array.from([GovernanceTrackerReaderService.BILL_SGT_SALE])),
+      atom(bytes('0x' + '11'.repeat(32))),
+      int(25_000n),
+      atom(bytes('0x' + '12'.repeat(32))),
+      int(1n),
+      atom(bytes('0x' + '00'.repeat(32))),
+      int(2_500_000_000_000n),
+      atom(bytes('0x' + '13'.repeat(32))),
+      int(1_900_000_000n),
+      atom(bytes('0x' + '14'.repeat(32))),
+      atom(bytes('0x' + '00'.repeat(32))),
+    ]);
+    const bill = service.decodeBill(symToNode(billOp));
+    expect(bill.kind).toBe('SGT_SALE');
+    if (bill.kind === 'SGT_SALE') {
+      expect(bill.sgtAmount).toBe(25_000n);
+      expect(bill.paymentRail).toBe('XCH');
+      expect(bill.paymentAmount).toBe(2_500_000_000_000n);
+      expect(bill.recipientVaultLauncherId).toBe('0x' + '12'.repeat(32));
+      expect(bill.companyTreasuryPuzzleHash).toBe('0x' + '13'.repeat(32));
+      expect(bill.reserveOwnerInnerPuzzleHash).toBe('0x' + '14'.repeat(32));
+      expect(bill.purchaseArtifactHash).toBe('0x' + '00'.repeat(32));
+    }
+  });
+
+  it('decodes the exact Stripe rail and its external purchase commitment', () => {
+    const billOp = list([
+      atom(Uint8Array.from([GovernanceTrackerReaderService.BILL_SGT_SALE])),
+      atom(bytes('0x' + '31'.repeat(32))),
+      int(10_000n),
+      atom(bytes('0x' + '32'.repeat(32))),
+      int(3n),
+      atom(bytes('0x' + '00'.repeat(32))),
+      int(101_000n),
+      atom(bytes('0x' + '33'.repeat(32))),
+      int(1_900_000_000n),
+      atom(bytes('0x' + '34'.repeat(32))),
+      atom(bytes('0x' + '35'.repeat(32))),
+    ]);
+    const bill = service.decodeBill(symToNode(billOp));
+    expect(bill.kind).toBe('SGT_SALE');
+    if (bill.kind === 'SGT_SALE') {
+      expect(bill.paymentRail).toBe('STRIPE');
+      expect(bill.paymentAmount).toBe(101_000n);
+      expect(bill.purchaseArtifactHash).toBe('0x' + '35'.repeat(32));
+    }
+  });
+
+  it('decodes an exact SGT grant bill', () => {
+    const billOp = list([
+      atom(Uint8Array.from([GovernanceTrackerReaderService.BILL_SGT_GRANT])),
+      atom(bytes('0x' + '21'.repeat(32))),
+      int(10_000n),
+      atom(bytes('0x' + '22'.repeat(32))),
+      atom(bytes('0x' + '23'.repeat(32))),
+      atom(bytes('0x' + '24'.repeat(32))),
+    ]);
+    const bill = service.decodeBill(symToNode(billOp));
+    expect(bill.kind).toBe('SGT_GRANT');
+    if (bill.kind === 'SGT_GRANT') {
+      expect(bill.sgtAmount).toBe(10_000n);
+      expect(bill.recipientVaultLauncherId).toBe('0x' + '22'.repeat(32));
+      expect(bill.reasonHash).toBe('0x' + '23'.repeat(32));
+      expect(bill.reserveOwnerInnerPuzzleHash).toBe('0x' + '24'.repeat(32));
+    }
+  });
+
   it('decodes an unknown bill tag without throwing', () => {
     const billOp = list([atom(Uint8Array.from([0x5a /* 'Z' */])), nil()]);
     const bill = service.decodeBill(symToNode(billOp));

@@ -63,6 +63,10 @@ export class GovernanceTrackerReaderService {
   static readonly BILL_SETTLE = 0x53;
   /** 'V' — ratify a vault_version_registry code change. */
   static readonly BILL_VAULT_VERSION = 0x56;
+  /** 'Y' — sell a fixed company-reserve SGT allocation. */
+  static readonly BILL_SGT_SALE = 0x59;
+  /** 'G' — grant a fixed company-reserve SGT allocation. */
+  static readonly BILL_SGT_GRANT = 0x47;
 
   /**
    * Read the current state of the governance tracker singleton.
@@ -244,6 +248,50 @@ export class GovernanceTrackerReaderService {
           ),
           newVaultVersion: rest.rest().rest().first().toInt(),
         };
+      case GovernanceTrackerReaderService.BILL_SGT_SALE:
+        const paymentRail = decodeSgtSalePaymentRail(
+          rest.rest().rest().rest().first().toInt(),
+        );
+        return {
+          kind: 'SGT_SALE',
+          saleId: bytesToHex(rest.first().toAtom() ?? new Uint8Array()),
+          sgtAmount: rest.rest().first().toInt(),
+          recipientVaultLauncherId: bytesToHex(
+            rest.rest().rest().first().toAtom() ?? new Uint8Array(),
+          ),
+          paymentRail,
+          paymentAssetId: bytesToHex(
+            rest.rest().rest().rest().rest().first().toAtom() ?? new Uint8Array(),
+          ),
+          paymentAmount: rest.rest().rest().rest().rest().rest().first().toInt(),
+          companyTreasuryPuzzleHash: bytesToHex(
+            rest.rest().rest().rest().rest().rest().rest().first().toAtom() ?? new Uint8Array(),
+          ),
+          expiresAt: rest.rest().rest().rest().rest().rest().rest().rest().first().toInt(),
+          reserveOwnerInnerPuzzleHash: bytesToHex(
+            rest.rest().rest().rest().rest().rest().rest().rest().rest().first().toAtom() ??
+              new Uint8Array(),
+          ),
+          purchaseArtifactHash: bytesToHex(
+            rest.rest().rest().rest().rest().rest().rest().rest().rest().rest().first().toAtom() ??
+              new Uint8Array(),
+          ),
+        };
+      case GovernanceTrackerReaderService.BILL_SGT_GRANT:
+        return {
+          kind: 'SGT_GRANT',
+          grantId: bytesToHex(rest.first().toAtom() ?? new Uint8Array()),
+          sgtAmount: rest.rest().first().toInt(),
+          recipientVaultLauncherId: bytesToHex(
+            rest.rest().rest().first().toAtom() ?? new Uint8Array(),
+          ),
+          reasonHash: bytesToHex(
+            rest.rest().rest().rest().first().toAtom() ?? new Uint8Array(),
+          ),
+          reserveOwnerInnerPuzzleHash: bytesToHex(
+            rest.rest().rest().rest().rest().first().toAtom() ?? new Uint8Array(),
+          ),
+        };
       default:
         return {
           kind: 'UNKNOWN',
@@ -420,14 +468,14 @@ export class GovernanceTrackerReaderService {
     const singletonStruct = fullUncurried.args[0];
     const oldInner = fullUncurried.args[1];
     const innerUncurried = oldInner.uncurry();
-    if (!innerUncurried || innerUncurried.args.length !== 16) {
+    if (!innerUncurried || innerUncurried.args.length !== 19) {
       throw new Error(
-        `${label}: tracker inner expects 16 curried args, ` +
+        `${label}: tracker inner expects 19 curried args, ` +
           `got ${innerUncurried?.args.length ?? 0}`,
       );
     }
     // Replace the last 4 state args with the CURRENT state (post-transition).
-    const immutableArgs = innerUncurried.args.slice(0, 12);
+    const immutableArgs = innerUncurried.args.slice(0, 15);
     const proposalHashBytes = hexToBytes(snapshot.proposalHash);
     const billProgram = this.encodeBillProgram(clvm, snapshot.bill);
     const newStateArgs = [
@@ -561,9 +609,9 @@ export class GovernanceTrackerReaderService {
     const singletonStruct = fullUncurried.args[0];
     const oldInner = fullUncurried.args[1];
     const innerUncurried = oldInner.uncurry();
-    if (!innerUncurried || innerUncurried.args.length !== 16) {
+    if (!innerUncurried || innerUncurried.args.length !== 19) {
       throw new Error(
-        `getIdleStateProposeInputs: tracker inner expects 16 curried ` +
+        `getIdleStateProposeInputs: tracker inner expects 19 curried ` +
           `args, got ${innerUncurried?.args.length ?? 0}`,
       );
     }
@@ -571,7 +619,7 @@ export class GovernanceTrackerReaderService {
     // CLVM the zero integer and the nil (empty) atom share the same
     // canonical serialisation; we use clvm.nil() for byte-exact match
     // with how `Program.to(0)` is encoded by chia_rs.
-    const immutableArgs = innerUncurried.args.slice(0, 12);
+    const immutableArgs = innerUncurried.args.slice(0, 15);
     const idleStateArgs = [clvm.nil(), clvm.nil(), clvm.nil(), clvm.nil()];
     const newInner = innerUncurried.program.curry([
       ...immutableArgs,
@@ -654,6 +702,29 @@ export class GovernanceTrackerReaderService {
           clvm.atom(hexToBytes(bill.newCanonicalParamsHash)),
           clvm.int(bill.newVaultVersion),
         ]);
+      case 'SGT_SALE':
+        return clvm.list([
+          clvm.atom(new Uint8Array([GovernanceTrackerReaderService.BILL_SGT_SALE])),
+          clvm.atom(hexToBytes(bill.saleId)),
+          clvm.int(bill.sgtAmount),
+          clvm.atom(hexToBytes(bill.recipientVaultLauncherId)),
+          clvm.int(sgtSalePaymentRailCode(bill.paymentRail)),
+          clvm.atom(hexToBytes(bill.paymentAssetId)),
+          clvm.int(bill.paymentAmount),
+          clvm.atom(hexToBytes(bill.companyTreasuryPuzzleHash)),
+          clvm.int(bill.expiresAt),
+          clvm.atom(hexToBytes(bill.reserveOwnerInnerPuzzleHash)),
+          clvm.atom(hexToBytes(bill.purchaseArtifactHash)),
+        ]);
+      case 'SGT_GRANT':
+        return clvm.list([
+          clvm.atom(new Uint8Array([GovernanceTrackerReaderService.BILL_SGT_GRANT])),
+          clvm.atom(hexToBytes(bill.grantId)),
+          clvm.int(bill.sgtAmount),
+          clvm.atom(hexToBytes(bill.recipientVaultLauncherId)),
+          clvm.atom(hexToBytes(bill.reasonHash)),
+          clvm.atom(hexToBytes(bill.reserveOwnerInnerPuzzleHash)),
+        ]);
       case 'UNKNOWN':
         throw new Error(
           `encodeBillProgram: cannot encode UNKNOWN bill with tag ${bill.tagHex}`,
@@ -719,6 +790,27 @@ export type DecodedBill =
       newVaultInnerModHash: string;
       newCanonicalParamsHash: string;
       newVaultVersion: bigint;
+    }
+  | {
+      kind: 'SGT_SALE';
+      saleId: string;
+      sgtAmount: bigint;
+      recipientVaultLauncherId: string;
+      paymentRail: 'XCH' | 'WUSDC_B' | 'STRIPE' | 'BASE_USDC';
+      paymentAssetId: string;
+      paymentAmount: bigint;
+      companyTreasuryPuzzleHash: string;
+      expiresAt: bigint;
+      reserveOwnerInnerPuzzleHash: string;
+      purchaseArtifactHash: string;
+    }
+  | {
+      kind: 'SGT_GRANT';
+      grantId: string;
+      sgtAmount: bigint;
+      recipientVaultLauncherId: string;
+      reasonHash: string;
+      reserveOwnerInnerPuzzleHash: string;
     }
   | { kind: 'UNKNOWN'; tagHex: string };
 
@@ -873,4 +965,25 @@ interface ClvmShape {
 
 function is32ByteHex(v: string | null | undefined): v is string {
   return typeof v === 'string' && /^0x[0-9a-fA-F]{64}$/.test(v);
+}
+
+function decodeSgtSalePaymentRail(value: bigint): Extract<DecodedBill, { kind: 'SGT_SALE' }>['paymentRail'] {
+  switch (value) {
+    case 1n:
+      return 'XCH';
+    case 2n:
+      return 'WUSDC_B';
+    case 3n:
+      return 'STRIPE';
+    case 4n:
+      return 'BASE_USDC';
+    default:
+      throw new Error(`Unknown governed SGT payment rail ${value}`);
+  }
+}
+
+function sgtSalePaymentRailCode(
+  value: Extract<DecodedBill, { kind: 'SGT_SALE' }>['paymentRail'],
+): bigint {
+  return { XCH: 1n, WUSDC_B: 2n, STRIPE: 3n, BASE_USDC: 4n }[value];
 }

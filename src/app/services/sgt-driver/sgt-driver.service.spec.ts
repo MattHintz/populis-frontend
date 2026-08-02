@@ -28,14 +28,14 @@ const LOCK_DEADLINE = 1_000_000n;
 const EXPECTED = {
   trackerStructHash: '0x7afc743110b633ca1b1d52c25386ddeb0f6cf02d1408de73c4c0a7eb7cf5d01e',
   sgtTailHash:        '0x8fc6334ddfc2b486e366b67b37cc9de986a342c03f2e7b7cb8d4ff094a6a8ded',
-  sgtFreeInnerHash:   '0x78dfb4f4b65b2f5c9f0b0f536c26e2496fb6e15761bcf8a6076d836a6e41d1a4',
-  sgtLockedInnerHash: '0x898de6ee4739a42667288fc24bbc2861a57246f1fa52d74643e3454787f1931e',
-  catSgtFreePuzhash:  '0x9213ebe1d9ab6122c9cd40a1deb70dc03ef186c270ea1e56e30c76110af4a542',
+  sgtFreeInnerHash:   '0xa1547d0de396c0b17dc231af929009cce04c012973d76bef945a7b506a7547e3',
+  sgtLockedInnerHash: '0x65b7e0e160c7ee00d5b39a09e0d9ba77d6010763319bf6a8275c877bf89c291c',
+  catSgtFreePuzhash:  '0xa1239ea88d98d1b582b67ae5918e9c9695ef3ebbd8cdbaeb45e539a6191dc6a0',
   billMint:           '0xd7582ffa72b0a5044b9284f9d91947a24c59caff847157943f991fc3e994912d',
   billSettle:         '0x4b6b3bcadad3e62c2c36c7ac8b3ffd28679590ef77e6e387fedd1a8946ec867b',
   billVaultVersion:  '0xde049c8cb6fbee29e8f925ed9d2fee7dbb7823c5edda3e1d51f5374da65971f0',
   lockArgsTreeHash:   '0x49dc1c754139a79d33feae0e7d6a66a47d770323ff9e95b17379749c96911c1d',
-  lockAnnouncementId: '0x3a4870161e24914507db1250595ab2c3d404f15bf5049f36c9f072c9d6c23f6d',
+  lockAnnouncementId: '0xbe1c5e95f557326f3de2292bc08fd267043ff433ad3356296ce7b7833771b51a',
 };
 
 function hex(b: Uint8Array): string {
