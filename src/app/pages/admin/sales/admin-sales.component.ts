@@ -42,7 +42,6 @@ type DeskFilter = 'ALL' | 'ATTENTION' | 'IN_PROGRESS' | 'COMPLETED';
           <span>{{ errors().join(' ') }}</span>
         </div>
       }
-
       <section class="summary" aria-label="Fulfillment summary">
         <button type="button" [class.is-active]="filter() === 'ALL'" (click)="filter.set('ALL')">
           <span>All activity</span><strong>{{ totalCount() }}</strong>
@@ -335,11 +334,13 @@ export class AdminSalesComponent {
   }
 
   voucherPaymentAmount(voucher: PresaleVoucher): string {
+    if (voucher.paymentRail === 'STRIPE_USD') return this.usd(BigInt(voucher.paymentPrincipal));
     if (voucher.paymentRail === 'BASE_SEPOLIA_USDC') return this.usd(BigInt(voucher.paymentPrincipal), 6);
     return `${(voucher.paymentPrincipal / 1_000_000_000_000).toLocaleString(undefined, { maximumFractionDigits: 12 })} XCH`;
   }
 
   voucherRail(voucher: PresaleVoucher): string {
+    if (voucher.paymentRail === 'STRIPE_USD') return 'Stripe USD';
     return voucher.paymentRail === 'BASE_SEPOLIA_USDC' ? 'Base USDC' : 'XCH offer';
   }
 

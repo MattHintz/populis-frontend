@@ -113,4 +113,14 @@ describe('AdminSalesComponent', () => {
     expect(fixture.componentInstance.evidenceReference(sgtStripe)).toBe(expectedSgtCoinId);
     expect(fixture.componentInstance.purchaseTitle(sgtStripe)).toBe('25,000 SGT');
   });
+
+  it('renders Stripe voucher principal as USD cents', () => {
+    const voucher = {
+      paymentRail: 'STRIPE_USD',
+      paymentPrincipal: 23_129,
+    } as Parameters<AdminSalesComponent['voucherPaymentAmount']>[0];
+
+    expect(fixture.componentInstance.voucherPaymentAmount(voucher)).toBe('$231.29');
+    expect(fixture.componentInstance.voucherRail(voucher)).toBe('Stripe USD');
+  });
 });
