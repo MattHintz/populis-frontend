@@ -146,6 +146,65 @@ describe('CommitteeComponent', () => {
     expect(voteBtn?.hasAttribute('disabled')).toBeTrue();
   });
 
+  it('renders a governed SGT sale in investor-readable units', async () => {
+    setUp({
+      kind: 'OPEN',
+      proposalHash: b32('31'),
+      bill: {
+        kind: 'SGT_SALE',
+        saleId: b32('32'),
+        sgtAmount: 25_000n,
+        recipientVaultLauncherId: b32('33'),
+        paymentRail: 'XCH',
+        paymentAssetId: b32('00'),
+        paymentAmount: 2_500_000_000_000n,
+        companyTreasuryPuzzleHash: b32('34'),
+        expiresAt: 1_900_000_000n,
+        reserveOwnerInnerPuzzleHash: b32('35'),
+        purchaseArtifactHash: b32('00'),
+      },
+      voteTally: 25_000n,
+      votingDeadlineSeconds: BigInt(Math.floor(Date.now() / 1000) + 600),
+      quorumRequired: 500_000n,
+      spendCount: 1,
+      lastSpendBlockIndex: 8,
+    });
+    await flushReload();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Sell 25,000 SGT');
+    expect(text).toContain('2.5 XCH');
+    expect(text).not.toContain('Unknown bill');
+  });
+
+  it('renders a Stripe SGT sale without mislabeling it as wUSDC.b', async () => {
+    setUp({
+      kind: 'OPEN',
+      proposalHash: b32('41'),
+      bill: {
+        kind: 'SGT_SALE',
+        saleId: b32('42'),
+        sgtAmount: 10_000n,
+        recipientVaultLauncherId: b32('43'),
+        paymentRail: 'STRIPE',
+        paymentAssetId: b32('00'),
+        paymentAmount: 101_000n,
+        companyTreasuryPuzzleHash: b32('44'),
+        expiresAt: 1_900_000_000n,
+        reserveOwnerInnerPuzzleHash: b32('45'),
+        purchaseArtifactHash: b32('46'),
+      },
+      voteTally: 0n,
+      votingDeadlineSeconds: BigInt(Math.floor(Date.now() / 1000) + 600),
+      quorumRequired: 500_000n,
+      spendCount: 1,
+      lastSpendBlockIndex: 9,
+    });
+    await flushReload();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('1,010 USD via Stripe');
+    expect(text).not.toContain('wUSDC.b');
+  });
+
   it('renders AWAITING_EXECUTE MINT proposals as GC:PASSED with execute action', async () => {
     setUp({
       kind: 'AWAITING_EXECUTE',

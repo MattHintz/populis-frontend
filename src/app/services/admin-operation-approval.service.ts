@@ -14,10 +14,10 @@ export type AdminOperationName =
   | 'mint.cancel'
   | 'mint.execute'
   | 'mint.publish'
+  | 'sgt.allocate'
   | 'presale.create'
   | 'presale.cancel'
-  | 'presale.launch'
-  | 'stripe.dispute.resolve';
+  | 'presale.launch';
 
 export interface AdminRequestBindingV1 {
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';

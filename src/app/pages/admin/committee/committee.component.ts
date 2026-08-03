@@ -509,6 +509,10 @@ export class CommitteeComponent {
         return 'SETTLE batch';
       case 'VAULT_VERSION':
         return `VAULT_VERSION upgrade → v${bill.newVaultVersion}`;
+      case 'SGT_SALE':
+        return `Sell ${this.formatSgt(bill.sgtAmount)} SGT`;
+      case 'SGT_GRANT':
+        return `Grant ${this.formatSgt(bill.sgtAmount)} SGT`;
       case 'UNKNOWN':
         return `Unknown bill (tag ${bill.tagHex})`;
     }
@@ -524,6 +528,10 @@ export class CommitteeComponent {
         return `${bill.numDeeds} deeds · total ${bill.totalAmount} mojos`;
       case 'VAULT_VERSION':
         return `inner_mod_hash ${bill.newVaultInnerModHash}`;
+      case 'SGT_SALE':
+        return `${this.formatPayment(bill)} · delivered only to the approved vault`;
+      case 'SGT_GRANT':
+        return `approved vault ${bill.recipientVaultLauncherId} · reason ${bill.reasonHash}`;
       case 'UNKNOWN':
         return 'Off-chain interpretation unavailable.';
     }
@@ -541,6 +549,37 @@ export class CommitteeComponent {
 
   formatSgt(mojos: bigint): string {
     return mojos.toLocaleString('en-US');
+  }
+
+  formatPayment(bill: Extract<DecodedBill, { kind: 'SGT_SALE' }>): string {
+    if (bill.paymentRail === 'XCH') {
+      const whole = bill.paymentAmount / 1_000_000_000_000n;
+      const fraction = (bill.paymentAmount % 1_000_000_000_000n)
+        .toString()
+        .padStart(12, '0')
+        .replace(/0+$/, '');
+      return `${fraction ? `${whole}.${fraction}` : whole} XCH`;
+    }
+    if (bill.paymentRail === 'STRIPE') {
+      return `${this.formatMinorAmount(bill.paymentAmount, 2)} USD via Stripe`;
+    }
+    if (bill.paymentRail === 'BASE_USDC') {
+      return `${this.formatMinorAmount(bill.paymentAmount, 6)} Base USDC`;
+    }
+    const whole = bill.paymentAmount / 1_000n;
+    const fraction = (bill.paymentAmount % 1_000n)
+      .toString()
+      .padStart(3, '0')
+      .replace(/0+$/, '');
+    return `${fraction ? `${whole}.${fraction}` : whole} wUSDC.b`;
+  }
+
+  private formatMinorAmount(value: bigint, decimals: number): string {
+    const scale = 10n ** BigInt(decimals);
+    const whole = value / scale;
+    const fraction = (value % scale).toString().padStart(decimals, '0').replace(/0+$/, '');
+    const groupedWhole = whole.toLocaleString('en-US');
+    return fraction ? `${groupedWhole}.${fraction}` : groupedWhole;
   }
 
   progressPct(snap: TrackerStateSnapshot): number {
