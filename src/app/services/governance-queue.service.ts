@@ -7,7 +7,7 @@ import { AdminSessionService } from './admin-session.service';
 import { UnsignedCoinSpend } from './chia-wallet.service';
 import { Eip712TypedData } from './solslot-api.service';
 
-export type GovernanceProposalKind = 'SGT_SALE' | 'SGT_GRANT';
+export type GovernanceProposalKind = 'SGT_SALE' | 'SGT_GRANT' | 'FUNDED_REDEMPTION';
 export type SgtSalePaymentRail = 'XCH' | 'WUSDC_B' | 'STRIPE' | 'BASE_USDC';
 
 export interface SgtSalePaymentOption {

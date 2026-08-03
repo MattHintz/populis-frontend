@@ -49,4 +49,62 @@ describe('AdminSalesService', () => {
 
     expect((await promise)['state']).toBe('DELIVERY_SUBMITTED');
   });
+
+  it('submits the exact wallet-signed redemption funding bundle', async () => {
+    const proposalId = 'redemption-1';
+    const promise = service.submitRedemptionFunding(proposalId, {
+      coinSpends: [{
+        coin: {
+          parentCoinInfo: '11'.repeat(32),
+          puzzleHash: `0x${'22'.repeat(32)}`,
+          amount: 125_000,
+        },
+        puzzleReveal: 'ff01',
+        solution: '0x80',
+      }],
+      aggregatedSignature: '33'.repeat(96),
+    });
+    const request = http.expectOne(
+      `${environment.faucetApi}/admin/redemptions/${proposalId}/funding/submit`,
+    );
+    expect(request.request.method).toBe('POST');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer admin-jwt');
+    expect(request.request.body).toEqual({
+      spendBundle: {
+        coin_spends: [{
+          coin: {
+            parent_coin_info: `0x${'11'.repeat(32)}`,
+            puzzle_hash: `0x${'22'.repeat(32)}`,
+            amount: 125_000,
+          },
+          puzzle_reveal: '0xff01',
+          solution: '0x80',
+        }],
+        aggregated_signature: `0x${'33'.repeat(96)}`,
+      },
+    });
+    request.flush({
+      proposalId,
+      chainState: 'AWAITING_EXECUTE',
+      funding: { status: 'SUBMITTED' },
+    });
+
+    expect((await promise).funding.status).toBe('SUBMITTED');
+  });
+
+  it('resumes only the server-persisted exact funding bundle', async () => {
+    const proposalId = 'redemption-2';
+    const promise = service.resumeRedemptionFunding(proposalId);
+    const request = http.expectOne(
+      `${environment.faucetApi}/admin/redemptions/${proposalId}/funding/submit`,
+    );
+    expect(request.request.body).toEqual({});
+    request.flush({
+      proposalId,
+      chainState: 'AWAITING_EXECUTE',
+      funding: { status: 'SUBMITTED' },
+    });
+
+    expect((await promise).proposalId).toBe(proposalId);
+  });
 });

@@ -63,7 +63,7 @@ describe('SgtAllocationsComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('What SGT grants');
     expect(text).toContain('No administrator key');
-    expect(text).toContain('No SGT allocations prepared');
+    expect(text).toContain('No proposals prepared');
   });
 
   it('converts ordinary XCH to exact mojos before creating a sale draft', async () => {

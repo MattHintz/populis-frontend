@@ -402,6 +402,7 @@ export class ChiaWalletService {
   async transfer(args: {
     targetPuzzleHash: string;
     amount: number | bigint;
+    assetId?: string;
     memos?: ReadonlyArray<string>;
   }): Promise<SignedSpendBundle> {
     const state = this._state();
@@ -413,6 +414,10 @@ export class ChiaWalletService {
       throw new Error('transfer: amount must be >= 1 mojo');
     }
     const targetHashBare = stripHexPrefix(args.targetPuzzleHash);
+    const assetIdBare = args.assetId ? stripHexPrefix(args.assetId).toLowerCase() : '';
+    if (assetIdBare && !/^[0-9a-f]{64}$/.test(assetIdBare)) {
+      throw new Error('transfer: assetId must be a 32-byte hex CAT identifier');
+    }
     const memos: string[] = args.memos ? [...args.memos] : [];
 
     if (state.connection === 'goby') {
@@ -434,7 +439,7 @@ export class ChiaWalletService {
         {
           to: toBech32,
           amount: amountNum,
-          assetId: '',
+          assetId: assetIdBare,
           fee: 0,
           memos,
           waitForConfirmation: false,
@@ -446,7 +451,20 @@ export class ChiaWalletService {
       return this.invokeTransfer(
         this.getSageBridge(),
         ['chia_send', 'chip0002_send'],
-        { recipient: targetHashBare, amount: amountNum, memos },
+        {
+          recipient: targetHashBare,
+          amount: amountNum,
+          assetId: assetIdBare,
+          fee: 0,
+          memos,
+          waitForConfirmation: false,
+        },
+      );
+    }
+
+    if (state.connection === 'google' && assetIdBare) {
+      throw new Error(
+        'CAT funding requires Goby or Sage. Google Vault does not select CAT coins for administrator funding.',
       );
     }
 

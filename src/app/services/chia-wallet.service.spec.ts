@@ -134,7 +134,7 @@ describe('ChiaWalletService.signSpendBundle', () => {
   // Helper to put the service in a connected state without going
   // through a real wallet.  Connection + signing are independent
   // concerns; tests for one shouldn't require the other to work.
-  function setConnectedState(connection: 'goby' | 'sage'): void {
+  function setConnectedState(connection: 'goby' | 'sage' | 'google'): void {
     const internal = service as unknown as {
       _state: { set: (s: unknown) => void };
     };
@@ -381,13 +381,21 @@ describe('ChiaWalletService.signSpendBundle', () => {
 
     it('Sage: tries chia_send first, falls back to chip0002_send', async () => {
       setConnectedState('sage');
-      const mock = installMockWallet('sage', (method) => {
+      const mock = installMockWallet('sage', (method, params) => {
         if (method === 'chia_send') {
           const e = new Error('Unknown method');
           (e as unknown as { code: number }).code = -32601;
           return e;
         }
         expect(method).toBe('chip0002_send');
+        expect(params).toEqual({
+          recipient: 'bb'.repeat(32),
+          amount: 1,
+          assetId: '',
+          fee: 0,
+          memos: [],
+          waitForConfirmation: false,
+        });
         return { aggregatedSignature: SAMPLE_SIG, coinSpends: [] };
       });
       cleanup.push(mock.uninstall);
@@ -398,6 +406,71 @@ describe('ChiaWalletService.signSpendBundle', () => {
       });
       expect(result.aggregatedSignature).toBe(SAMPLE_SIG);
       expect(mock.calls.length).toBe(2);
+    });
+
+    it('Goby: sends an exact CAT using the normalized asset id', async () => {
+      setConnectedState('goby');
+      const assetId = '0x' + 'cc'.repeat(32);
+      const mock = installMockWallet('chia', (_method, params) => {
+        expect((params as { assetId: string }).assetId).toBe('cc'.repeat(32));
+        return { signature: SAMPLE_SIG, spendBundle: { coin_spends: [] } };
+      });
+      cleanup.push(mock.uninstall);
+
+      await service.transfer({
+        targetPuzzleHash: '0x' + 'aa'.repeat(32),
+        amount: 125_000,
+        assetId,
+      });
+    });
+
+    it('Sage: sends an exact CAT without allowing the wallet to add a fee', async () => {
+      setConnectedState('sage');
+      const mock = installMockWallet('sage', (_method, params) => {
+        expect(params).toEqual({
+          recipient: 'bb'.repeat(32),
+          amount: 125_000,
+          assetId: 'dd'.repeat(32),
+          fee: 0,
+          memos: ['SOLSLOT_REDEMPTION_FUNDING_V1'],
+          waitForConfirmation: false,
+        });
+        return { aggregatedSignature: SAMPLE_SIG, coinSpends: [] };
+      });
+      cleanup.push(mock.uninstall);
+
+      await service.transfer({
+        targetPuzzleHash: '0x' + 'bb'.repeat(32),
+        amount: 125_000n,
+        assetId: '0x' + 'dd'.repeat(32),
+        memos: ['SOLSLOT_REDEMPTION_FUNDING_V1'],
+      });
+    });
+
+    it('rejects malformed CAT identifiers before calling the wallet', async () => {
+      setConnectedState('goby');
+      const mock = installMockWallet('chia', () => SAMPLE_SIG);
+      cleanup.push(mock.uninstall);
+
+      await expectAsync(
+        service.transfer({
+          targetPuzzleHash: '0x' + 'aa'.repeat(32),
+          amount: 1,
+          assetId: 'not-a-cat',
+        }),
+      ).toBeRejectedWithError(/32-byte hex CAT identifier/);
+      expect(mock.calls.length).toBe(0);
+    });
+
+    it('does not pretend Google Vault can select CAT funding coins', async () => {
+      setConnectedState('google');
+      await expectAsync(
+        service.transfer({
+          targetPuzzleHash: '0x' + 'aa'.repeat(32),
+          amount: 1,
+          assetId: '0x' + 'dd'.repeat(32),
+        }),
+      ).toBeRejectedWithError(/CAT funding requires Goby or Sage/);
     });
 
     it('rejects auto-broadcast (wallet returned only a tx id)', async () => {

@@ -179,7 +179,7 @@ import { formatError } from '../../../utils/format-error';
           <div class="section-heading">
             <div>
               <span class="step">Governance tracker</span>
-              <h2 id="proposal-queue-title">Proposal queue</h2>
+              <h2 id="proposal-queue-title">Committee proposal queue</h2>
             </div>
             <span class="queue-count">{{ openCount() }} open</span>
           </div>
@@ -188,8 +188,8 @@ import { formatError } from '../../../utils/format-error';
             <p class="empty">Loading the queue…</p>
           } @else if (proposals().length === 0) {
             <div class="empty">
-              <strong>No SGT allocations prepared</strong>
-              <span>Create a sale or grant when there is a documented company purpose.</span>
+              <strong>No proposals prepared</strong>
+              <span>SGT allocations and funded SmartDeed redemptions appear here for review.</span>
             </div>
           } @else {
             <ol class="queue-list">
@@ -202,8 +202,7 @@ import { formatError } from '../../../utils/format-error';
                       <span class="status">{{ stateLabel(proposal) }}</span>
                     </div>
                     <p>
-                      {{ proposal.bill['sgtAmount'] }} SGT ·
-                      {{ proposal.kind === 'SGT_SALE' ? saleSummary(proposal) : 'governed grant' }}
+                      {{ proposalSummary(proposal) }}
                     </p>
                     <div class="queue-actions">
                       @if (proposal.state === 'DRAFT') {
@@ -230,9 +229,16 @@ import { formatError } from '../../../utils/format-error';
                         </button>
                       } @else if (proposal.state === 'ACTIVE') {
                         @if (canExecute(proposal)) {
-                          <button type="button" class="primary" (click)="execute(proposal)" [disabled]="busy()">
-                            Finalize allocation
-                          </button>
+                          @if (proposal.kind === 'FUNDED_REDEMPTION') {
+                            <a routerLink="/admin/sales">Open exact funding instructions</a>
+                            <button type="button" class="primary" (click)="execute(proposal)" [disabled]="busy()">
+                              Check funding and create offers
+                            </button>
+                          } @else {
+                            <button type="button" class="primary" (click)="execute(proposal)" [disabled]="busy()">
+                              Finalize allocation
+                            </button>
+                          }
                         } @else if (!proposal.executionBundleId) {
                           <section class="vault-vote" aria-label="Vote with vault-held SGT">
                             <div>
@@ -479,7 +485,7 @@ export class SgtAllocationsComponent {
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(null);
-  readonly kind = signal<GovernanceProposalKind>('SGT_SALE');
+  readonly kind = signal<Exclude<GovernanceProposalKind, 'FUNDED_REDEMPTION'>>('SGT_SALE');
   readonly publications = signal<Record<string, GovernancePublicationPackage>>({});
   readonly coadmins = signal<Record<string, number>>({});
   readonly chainResults = signal<Record<string, GovernanceChainResult>>({});
@@ -673,11 +679,15 @@ export class SgtAllocationsComponent {
       const result = await this.api.execute(proposal.id);
       this.storeChainResult(result);
       this.scheduleExecutionCheck(proposal.id);
-      this.notice.set(
-        proposal.bill['paymentRail'] === 'XCH' || proposal.bill['paymentRail'] === 'WUSDC_B'
-          ? 'The approved allocation is in the Testnet11 mempool. Its exact Chia offer will appear after confirmation.'
-          : 'The approved allocation is in the Testnet11 mempool. External payment remains locked to its exact purchase artifact.',
-      );
+      if (proposal.kind === 'FUNDED_REDEMPTION') {
+        this.notice.set('The approved wUSDC.b allocation is in the Testnet11 mempool. Permanent SmartDeed offers appear after confirmation.');
+      } else {
+        this.notice.set(
+          proposal.bill['paymentRail'] === 'XCH' || proposal.bill['paymentRail'] === 'WUSDC_B'
+            ? 'The approved allocation is in the Testnet11 mempool. Its exact Chia offer will appear after confirmation.'
+            : 'The approved allocation is in the Testnet11 mempool. External payment remains locked to its exact purchase artifact.',
+        );
+      }
     });
   }
 
@@ -732,6 +742,9 @@ export class SgtAllocationsComponent {
 
   chainSummary(proposal: GovernanceProposalRecord, chain: GovernanceChainResult): string {
     if (chain.chainState === 'AWAITING_EXECUTE') {
+      if (proposal.kind === 'FUNDED_REDEMPTION') {
+        return `The vote passed. Fund the exact ${this.wusdc(String(proposal.bill['totalPaymentAmount']))} allocation across ${proposal.bill['deedCount']} SmartDeeds.`;
+      }
       return `The vote passed. Finalize the exact ${proposal.bill['sgtAmount']} SGT allocation; no new approval or destination can be added.`;
     }
     if (chain.chainState === 'EXECUTION_PENDING') {
@@ -743,6 +756,17 @@ export class SgtAllocationsComponent {
       return `${votes}. Voting closes at ${deadline}.`;
     }
     return 'The status is reconstructed from the confirmed governance tracker and allocation output coins.';
+  }
+
+  proposalSummary(proposal: GovernanceProposalRecord): string {
+    if (proposal.kind === 'FUNDED_REDEMPTION') {
+      return `${this.wusdc(String(proposal.bill['totalPaymentAmount']))} · ${proposal.bill['deedCount']} permanent SmartDeed offers`;
+    }
+    return `${proposal.bill['sgtAmount']} SGT · ${proposal.kind === 'SGT_SALE' ? this.saleSummary(proposal) : 'governed grant'}`;
+  }
+
+  wusdc(value: string): string {
+    return `${formatAssetUnits(value, 3)} wUSDC.b`;
   }
 
   saleSummary(proposal: GovernanceProposalRecord): string {
@@ -912,6 +936,8 @@ export class SgtAllocationsComponent {
         this.storeChainResult(result);
         if (result.proposal.state === 'ACTIVE') {
           this.scheduleExecutionCheck(proposalId, attempt + 1);
+        } else if (result.proposal.kind === 'FUNDED_REDEMPTION') {
+          this.notice.set('The settlement is confirmed and permanent wUSDC.b offers are available to the approved SmartDeed vaults.');
         } else if (result.proposal.kind === 'SGT_SALE') {
           this.notice.set(
             result.proposal.bill['paymentRail'] === 'XCH' || result.proposal.bill['paymentRail'] === 'WUSDC_B'
