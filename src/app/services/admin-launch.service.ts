@@ -102,12 +102,6 @@ export class AdminLaunchService {
     return this.post('/settlement-rehearsal/start', {});
   }
 
-  submitSettlementRehearsalTransaction(
-    transactionHash: string,
-  ): Promise<SettlementRehearsalResult> {
-    return this.post('/settlement-rehearsal/transaction', { transactionHash });
-  }
-
   prepareFunding(): Promise<FundingPreparation> {
     return this.post<FundingPreparation>('/funding/prepare', {});
   }
@@ -439,20 +433,15 @@ export interface RailOwnershipResult {
 
 export type SettlementRehearsalState =
   | 'NOT_STARTED'
-  | 'PREPARED'
-  | 'AWAITING_WALLET'
-  | 'PAYMENT_SUBMITTED'
   | 'VALIDATING'
   | 'SUCCEEDED'
   | 'FAILED';
 
 export type SettlementRehearsalPhase =
   | 'PREPARE'
-  | 'APPROVE_DELIVERY'
-  | 'PAY_DELIVERY'
+  | 'WAITING_DELIVERY_PURCHASE'
   | 'VERIFY_DELIVERY'
-  | 'APPROVE_REFUND'
-  | 'PAY_REFUND'
+  | 'WAITING_REFUND_PURCHASE'
   | 'VERIFY_REFUND'
   | 'COMPLETE';
 
@@ -464,15 +453,15 @@ export interface SettlementRehearsalStatus {
   step: string;
   message: string;
   assignedRole?: 'coadmin';
-  walletTransaction?: BaseSepoliaTransaction | null;
+  walletTransaction?: null;
   review?: {
-    action: 'approve' | 'pay' | 'verify';
+    action: 'purchase' | 'refund' | 'verify';
     lane: 'delivery' | 'refund';
-    asset: 'USDC';
+    asset: 'USD';
     amountMinor: string;
     amountLabel: string;
-    escrow: string;
-    destinationVault: string;
+    paymentIntentId: string;
+    approvedVault: string;
     deedLauncherId: string;
     expectedOutcome: 'DELIVERED' | 'REFUND';
   } | null;

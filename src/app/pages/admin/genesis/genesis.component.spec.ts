@@ -104,7 +104,6 @@ describe('GenesisComponent', () => {
       'recordRailOwnershipBroadcast',
       'settlementRehearsal',
       'startSettlementRehearsal',
-      'submitSettlementRehearsalTransaction',
       'prepareFunding',
       'executeFunding',
       'confirmFunding',
@@ -496,7 +495,8 @@ describe('GenesisComponent', () => {
 
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Run the customer payment check');
-    expect(text).toContain('Use the same test SmartDeed twice');
+    expect(text).toContain('Complete two Stripe test purchases');
+    expect(text).toContain('Stripe test mode');
     expect(text).toContain('Send a test payment');
     expect(text).toContain('Prove a full refund');
     expect(text).toContain('Unlock sales controls');

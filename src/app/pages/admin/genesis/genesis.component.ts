@@ -61,10 +61,6 @@ type PendingDecision =
   | {
       kind: 'rail-broadcast';
       rail: RailOwnershipResult;
-    }
-  | {
-      kind: 'rehearsal-payment';
-      rehearsal: SettlementRehearsalResult;
     };
 
 interface LaunchStage {
@@ -461,14 +457,6 @@ export class GenesisComponent implements OnInit, OnDestroy {
           ),
         );
         this.startRailPolling();
-      } else if (decision.kind === 'rehearsal-payment') {
-        const transaction = decision.rehearsal.status.walletTransaction;
-        if (!transaction) throw new Error('The fixed rehearsal transaction is not ready.');
-        const transactionHash = await this.wallet.sendBaseSepoliaTransaction(transaction);
-        this.settlementRehearsal.set(
-          await this.launch.submitSettlementRehearsalTransaction(transactionHash),
-        );
-        this.startRehearsalPolling();
       } else {
         await this.launch.broadcast();
       }
@@ -562,7 +550,6 @@ export class GenesisComponent implements OnInit, OnDestroy {
     if (decision.kind === 'rail-sign' || decision.kind === 'rail-broadcast') {
       return decision.rail.decisionReceipt;
     }
-    if (decision.kind === 'rehearsal-payment') return decision.rehearsal.decisionReceipt;
     return decision.receipt;
   }
 
@@ -743,13 +730,11 @@ export class GenesisComponent implements OnInit, OnDestroy {
     if (status.state === 'FAILED') return 'Retry payment check';
     if (status.state === 'SUCCEEDED') return 'Payment path ready';
     const labels: Record<string, string> = {
-      PREPARE: 'Prepare payment check',
-      APPROVE_DELIVERY: 'Approve test USDC',
-      PAY_DELIVERY: 'Send delivery payment',
-      VERIFY_DELIVERY: 'Refresh delivery status',
-      APPROVE_REFUND: 'Approve refund test',
-      PAY_REFUND: 'Send refund payment',
-      VERIFY_REFUND: 'Refresh refund status',
+      PREPARE: 'Start payment check',
+      WAITING_DELIVERY_PURCHASE: 'Check delivery purchase',
+      VERIFY_DELIVERY: 'Check SmartDeed delivery',
+      WAITING_REFUND_PURCHASE: 'Check refund purchase',
+      VERIFY_REFUND: 'Check exact refund',
       COMPLETE: 'Payment path ready',
     };
     return labels[status.phase] ?? 'Check progress';
@@ -774,21 +759,17 @@ export class GenesisComponent implements OnInit, OnDestroy {
         rehearsal = await this.launch.startSettlementRehearsal();
         this.settlementRehearsal.set(rehearsal);
       }
-      if (rehearsal.status.walletTransaction) {
-        this.pendingDecision.set({ kind: 'rehearsal-payment', rehearsal });
-        return;
-      }
-      if (
-        ['PREPARED', 'AWAITING_WALLET', 'PAYMENT_SUBMITTED', 'VALIDATING'].includes(
-          rehearsal.status.state,
-        )
-      ) {
+      if (rehearsal.status.state === 'VALIDATING') {
         this.startRehearsalPolling();
         this.message.set(
           rehearsal.status.message || 'The payment check is running. This page will update.',
         );
       }
     });
+  }
+
+  openSalesDesk(): void {
+    void this.router.navigate(['/admin/sales']);
   }
 
   private async advanceFinalLaunch(): Promise<void> {
@@ -975,11 +956,6 @@ export class GenesisComponent implements OnInit, OnDestroy {
     );
     if (!result) return;
     this.settlementRehearsal.set(result);
-    if (result.status.walletTransaction) {
-      this.stopRehearsalPolling();
-      this.message.set('The next test-wallet step is ready for review.');
-      return;
-    }
     if (result.status.state === 'SUCCEEDED' || result.status.state === 'FAILED') {
       this.stopRehearsalPolling();
       await this.reloadWorkspace();
