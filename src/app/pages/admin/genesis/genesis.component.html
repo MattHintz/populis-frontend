@@ -551,15 +551,15 @@
               </span>
             </div>
             <p>
-              Use the same test SmartDeed twice. The first payment must deliver it. The second must
-              return every test dollar because that deed is no longer available.
+              Complete two Stripe test purchases from an approved vault. Deliver the first
+              SmartDeed, then cancel the second reservation and prove the full test payment returns.
             </p>
             <ol class="payment-checklist" aria-label="Customer payment activation steps">
               <li [class.is-complete]="rehearsalCompleted(1)">
                 <span>1</span>
                 <div>
                   <strong>Send a test payment</strong>
-                  <small>Approve and send test USDC for one fixed SmartDeed.</small>
+                  <small>Use Stripe test mode to reserve one governed SmartDeed.</small>
                 </div>
               </li>
               <li [class.is-complete]="rehearsalCompleted(2)">
@@ -573,7 +573,7 @@
                 <span>3</span>
                 <div>
                   <strong>Prove a full refund</strong>
-                  <small>Pay the same amount for the same deed and confirm every test dollar returns.</small>
+                  <small>Use a second voucher, request cancellation, and confirm the exact amount returns.</small>
                 </div>
               </li>
               <li [class.is-complete]="rehearsalCompleted(4)">
@@ -598,6 +598,16 @@
                 }}
               </span>
             </div>
+            @if (settlementRehearsal()?.status?.state !== 'SUCCEEDED') {
+              <div class="inline-actions" aria-label="Payment check workspaces">
+                <a class="btn btn--ghost" href="/" target="_blank" rel="noopener">
+                  Open customer market
+                </a>
+                <button type="button" class="btn btn--ghost" (click)="openSalesDesk()">
+                  Open Sales &amp; Refunds
+                </button>
+              </div>
+            }
             @if (settlementRehearsal()?.status?.review; as review) {
               <dl class="payment-review" aria-label="Current payment test">
                 <div>
@@ -610,19 +620,19 @@
                 </div>
                 <div>
                   <dt>Network</dt>
-                  <dd>Base Sepolia</dd>
+                  <dd>Stripe test mode · Testnet11</dd>
                 </div>
               </dl>
               <details>
                 <summary>Verify exact destination</summary>
                 <dl class="technical-grid">
                   <div>
-                    <dt>Escrow</dt>
-                    <dd class="mono">{{ review.escrow }}</dd>
+                    <dt>Stripe payment</dt>
+                    <dd class="mono">{{ review.paymentIntentId }}</dd>
                   </div>
                   <div>
                     <dt>Test vault</dt>
-                    <dd class="mono">{{ review.destinationVault }}</dd>
+                    <dd class="mono">{{ review.approvedVault }}</dd>
                   </div>
                   <div>
                     <dt>Test deed</dt>
@@ -857,15 +867,6 @@
               customer funds; the submitting wallet pays only test-network gas.
             </span>
           </div>
-        } @else if (decision.kind === 'rehearsal-payment') {
-          <div class="wallet-review">
-            <strong>Before you approve</strong>
-            <span>
-              Use only the enrolled admin wallet shown in your browser. Confirm Base Sepolia and
-              {{ decision.rehearsal.status.review?.amountLabel || 'the fixed test amount' }}.
-              Never share your recovery phrase or approve an unlimited amount.
-            </span>
-          </div>
         } @else {
           <p class="wallet-review">
             Your wallet will show a signature request for only this exact Testnet action.
@@ -884,9 +885,7 @@
                 ? 'Launch Testnet protocol'
                 : decision.kind === 'rail-broadcast'
                   ? 'Submit reviewed Safe action'
-                : decision.kind === 'rehearsal-payment'
-                  ? rehearsalActionLabel(decision.rehearsal)
-                  : 'Approve exact action'
+                : 'Approve exact action'
             }}
           </button>
         </div>
